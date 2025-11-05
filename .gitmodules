@@ -1,0 +1,4 @@
+[submodule "node-infra"]
+	path = node-infra
+	url = https://github.com/offworldlab/node-infra.git
+	branch = main
