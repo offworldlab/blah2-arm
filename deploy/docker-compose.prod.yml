@@ -19,7 +19,7 @@ services:
       - /usr/local/lib/libsdrplay_api.so.3.15:/usr/local/lib/libsdrplay_api.so.3:ro 
       - /data/blah2/test:/opt/blah2/test
 
-      - /data/blah2/scripts/sdrplay-restart.sh:/opt/blah2/sdrplay-restart.sh
+      - /data/blah2/script/sdrplay-restart.sh:/opt/blah2/sdrplay-restart.sh #@TODO - can we bake this in?
 
     network_mode: host
     privileged: true
@@ -28,11 +28,9 @@ services:
 
   blah2_web:
     restart: always
-    image: httpd:2.4
+    image: ghcr.io/offworldlab/blah2-web:dev
     ports: 
       - 49152:80
-    volumes:
-      - /data/blah2/html:/usr/local/apache2/htdocs:ro
     networks:
       - blah2
     container_name: blah2-web
@@ -48,12 +46,9 @@ services:
 
   blah2_host:
     restart: always
-    image: nginx:alpine
+    image: ghcr.io/offworldlab/blah2-host:dev
     ports:
       - "8080:80"
-    volumes:
-      - /data/blah2/host/nginx.conf:/etc/nginx/nginx.conf:ro
-      - /data/blah2/host/html:/usr/local/apache2/htdocs:ro
     networks:
       - blah2
     container_name: blah2-host
