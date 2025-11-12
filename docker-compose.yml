@@ -33,7 +33,7 @@ services:
     ports: 
       - 49152:80
     volumes:
-      - ./html:/usr/local/apache2/htdocs
+      - ./web/html:/usr/local/apache2/htdocs
     networks:
       - blah2
     container_name: blah2-web

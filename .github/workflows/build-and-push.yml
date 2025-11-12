@@ -27,6 +27,12 @@ jobs:
           - name: blah2-api
             context: ./api
             image: ghcr.io/offworldlab/blah2-api
+          - name: blah2-web
+            context: ./web
+            image: ghcr.io/offworldlab/blah2-web
+          - name: blah2-host
+            context: ./host
+            image: ghcr.io/offworldlab/blah2-host
 
     steps:
       - uses: actions/checkout@v4
