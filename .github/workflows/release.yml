@@ -82,3 +82,13 @@ jobs:
           if [ -n "${{ steps.version.outputs.prev_version }}" ]; then
             echo "Delta: ${{ steps.version.outputs.prev_version }} → ${VERSION}" >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Upload to GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/blah2-stack-${{ steps.version.outputs.version }}.mender
+            artifacts/blah2-stack-${{ steps.version.outputs.version }}.json
+            manifests/${{ steps.version.outputs.version }}/docker-compose.yaml
+          fail_on_unmatched_files: true
