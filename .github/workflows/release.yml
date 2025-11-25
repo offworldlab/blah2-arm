@@ -96,3 +96,11 @@ jobs:
             artifacts/blah2-stack-${{ steps.version.outputs.version }}.json
             manifests/${{ steps.version.outputs.version }}/docker-compose.yaml
           fail_on_unmatched_files: true
+
+      - name: Upload to Mender
+        if: github.event_name == 'push'
+        uses: mendersoftware/mender-gh-action-upload-artifact@master
+        with:
+          mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN_APP }}
+          mender_uri: https://hosted.mender.io
+          mender_artifact: artifacts/blah2-stack-${{ steps.version.outputs.version }}.mender
