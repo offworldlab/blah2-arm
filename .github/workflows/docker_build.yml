@@ -48,21 +48,33 @@ jobs:
       - uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64  
+      
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build ${{ matrix.name }}
+      - name: Build and load ${{ matrix.name }}
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           platforms: linux/arm64
           push: false
-          load: false
-          tags: ${{ matrix.image }}:${{ inputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          load: true
+          tags: ${{ matrix.name }}:${{ inputs.tag }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+      
+      - name: Export image to tarball
+        run: |
+          docker save ${{ matrix.name }}:${{ inputs.tag }} -o /tmp/${{ matrix.name }}.tar
+      
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-image
+          path: /tmp/${{ matrix.name }}.tar
+          retention-days: 1
 
   test:
     needs: build
@@ -74,14 +86,21 @@ jobs:
       - uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
-      - uses: docker/setup-buildx-action@v3
       
-      - name: Load images
+      - name: Download all images
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/images
+      
+      - name: Load all images
         run: |
-          docker buildx build --platform linux/arm64 --load -t blah2:${{ inputs.tag }} --cache-from type=gha .
-          docker buildx build --platform linux/arm64 --load -t blah2-api:${{ inputs.tag }} --cache-from type=gha ./api
-          docker buildx build --platform linux/arm64 --load -t blah2-web:${{ inputs.tag }} --cache-from type=gha ./web
-          docker buildx build --platform linux/arm64 --load -t blah2-host:${{ inputs.tag }} --cache-from type=gha ./host
+          for img in /tmp/images/*/*.tar; do
+            echo "Loading $(basename $img)"
+            docker load -i "$img"
+          done
+          
+          echo "Verifying images:"
+          docker images | grep ${{ inputs.tag }}
       
       - name: Run tests
         run: |
@@ -97,25 +116,18 @@ jobs:
       matrix:
         include:
           - name: blah2
-            context: .
             image: ghcr.io/offworldlab/blah2
           - name: blah2-api
-            context: ./api
             image: ghcr.io/offworldlab/blah2-api
           - name: blah2-web
-            context: ./web
             image: ghcr.io/offworldlab/blah2-web
           - name: blah2-host
-            context: ./host
             image: ghcr.io/offworldlab/blah2-host
     
     steps:
-      - uses: actions/checkout@v4
-      
       - uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
-      - uses: docker/setup-buildx-action@v3
       
       - uses: docker/login-action@v3
         with:
@@ -123,15 +135,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Push ${{ matrix.name }}
-        uses: docker/build-push-action@v6
+      - name: Download image
+        uses: actions/download-artifact@v4
         with:
-          context: ${{ matrix.context }}
-          platforms: linux/arm64
-          push: true
-          tags: ${{ matrix.image }}:${{ inputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          labels: |
-            org.opencontainers.image.source=${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+          name: ${{ matrix.name }}-image
+          path: /tmp
+      
+      - name: Load and push ${{ matrix.name }}
+        run: |
+          docker load -i /tmp/${{ matrix.name }}.tar
+          docker tag ${{ matrix.name }}:${{ inputs.tag }} ${{ matrix.image }}:${{ inputs.tag }}
+          docker push ${{ matrix.image }}:${{ inputs.tag }}
