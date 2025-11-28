@@ -77,35 +77,54 @@ jobs:
           retention-days: 1
 
   test:
-    needs: build
-    runs-on: ubuntu-latest
-    
-    steps:
-      - uses: actions/checkout@v4
+      needs: build
+      runs-on: ubuntu-latest
       
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-      
-      - name: Download all images
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/images
-      
-      - name: Load all images
-        run: |
-          for img in /tmp/images/*/*.tar; do
-            echo "Loading $(basename $img)"
-            docker load -i "$img"
-          done
-          
-          echo "Verifying images:"
-          docker images | grep ${{ inputs.tag }}
-      
-      - name: Run tests
-        run: |
-          chmod +x deploy/scripts/test_images.sh
-          ./deploy/scripts/test_images.sh ${{ inputs.tag }}
+      steps:
+        - uses: actions/checkout@v4
+        
+        - uses: docker/setup-qemu-action@v3
+          with:
+            platforms: arm64
+        
+        - name: Download blah2 image
+          uses: actions/download-artifact@v4
+          with:
+            name: blah2-image
+            path: /tmp
+        
+        - name: Download blah2-api image
+          uses: actions/download-artifact@v4
+          with:
+            name: blah2-api-image
+            path: /tmp
+        
+        - name: Download blah2-web image
+          uses: actions/download-artifact@v4
+          with:
+            name: blah2-web-image
+            path: /tmp
+        
+        - name: Download blah2-host image
+          uses: actions/download-artifact@v4
+          with:
+            name: blah2-host-image
+            path: /tmp
+        
+        - name: Load all images
+          run: |
+            docker load -i /tmp/blah2.tar
+            docker load -i /tmp/blah2-api.tar
+            docker load -i /tmp/blah2-web.tar
+            docker load -i /tmp/blah2-host.tar
+            
+            echo "Loaded images:"
+            docker images | grep ${{ inputs.tag }}
+        
+        - name: Run tests
+          run: |
+            chmod +x deploy/scripts/test_images.sh
+            ./deploy/scripts/test_images.sh ${{ inputs.tag }}
 
   publish:
     needs: test
