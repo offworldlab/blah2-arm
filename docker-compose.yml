@@ -42,7 +42,9 @@ services:
 
   blah2_api:
     restart: always
-    build: ./api
+    build:
+      context: .
+      dockerfile: api/Dockerfile
     image: blah2_api
     volumes:
       - ./config:/usr/src/app/config  # Shared config directory (user.yml + debug copies)
