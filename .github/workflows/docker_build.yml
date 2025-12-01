@@ -33,7 +33,8 @@ jobs:
             context: .
             image: ghcr.io/offworldlab/blah2
           - name: blah2-api
-            context: ./api
+            context: .
+            dockerfile: api/Dockerfile
             image: ghcr.io/offworldlab/blah2-api
           - name: blah2-web
             context: ./web
