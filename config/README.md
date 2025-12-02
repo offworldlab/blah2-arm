@@ -1,6 +1,6 @@
 # blah2 Configuration
 
-blah2-arm uses a layered configuration system. Default configs are baked into containers, and user settings persist between updates. New configurations options can be easily introduced, updated and deployed to existing nodes by updating `default.yml`. 
+blah2-arm uses a layered configuration system. Default configs are baked into containers, and user settings persist between updates. New configurations options can be easily introduced, updated and deployed to existing nodes by updating `default.yml`. Note this configuration management is currently only supported for RspDuo duo
 
 ## Configuration Files
 
@@ -24,6 +24,6 @@ Both `blah2` and `blah2-api` containers independently merge configs on startup t
 ## Customising a Node
 
 1. Edit `/data/blah2/config/user.yml`
-2. Restart containers: `docker-compose restart`
-3. Verify changes: `cat /data/blah2/config/config.blah2.debug.yml`
+2. Restart blah2 and blah2-api containers: `sudo docker restart blah2-web blah2-api`
+3. Verify changes: `cat /data/blah2/config/config.blah2.debug.yml` and `cat /data/blah2/config/config.api.debug.yml`, these files should be identical which can be verified with `diff /data/blah2/config/config.blah2.debug.yml /data/blah2/config/config.api.debug.yml` the output should show no differences.
 
