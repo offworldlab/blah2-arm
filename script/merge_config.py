@@ -3,7 +3,8 @@
 Config merge script for blah2
 
 Designed to be run in both blah2 and blah2-api containers with baked-in configs.
-Merges default.yml + user.yml + forced.yml into config.yml
+Merges default.yml + user.yml + forced.yml into config.yml. 
+Also populates the node-id field in user.yml by reading the RPi serial number.
 
 Takes as inputs:
 1. Defaults directory - holds baked-in default.yml and forced.yml
@@ -23,6 +24,75 @@ import os
 import sys
 import shutil
 from mergedeep import merge
+
+
+def get_rpi_serial():
+    """Extract last 8 characters of RPi serial number (Pi hardware only)"""
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            content = f.read()
+            
+            # Check if this is a Raspberry Pi
+            if 'Raspberry Pi' not in content and 'BCM' not in content:
+                return None
+            
+            # Extract serial
+            for line in content.splitlines():
+                if line.startswith('Serial'):
+                    serial = line.split(':')[1].strip()
+                    # Just take last 8 hex characters
+                    if len(serial) >= 8 and serial != '0000000000000000':
+                        return serial[-8:]
+    except Exception as e:
+        print(f"Could not read RPi serial: {e}")
+    
+    return None
+
+
+def ensure_node_id(user_config_path):
+    """Add/update node_id in user config to match hardware serial"""
+    try:
+        # Load current user config
+        with open(user_config_path, 'r') as f:
+            user_config = yaml.safe_load(f) or {}
+        
+        # Generate node_id from hardware serial
+        serial = get_rpi_serial()
+        if not serial:
+            print("Not running on RPi hardware, skipping node_id generation")
+            return
+        
+        node_id = f"ret{serial}"
+        
+        # Check if node_id already exists
+        if 'network' in user_config and 'node_id' in user_config['network']:
+            current_id = user_config['network']['node_id']
+            if current_id == node_id:
+                print(f"Node ID already correct: {node_id}")
+                return
+            else:
+                # Node ID changed (board swap) - update it
+                print(f"Node ID mismatch - updating from '{current_id}' to '{node_id}'")
+        else:
+            print(f"Generating node_id from hardware serial: {node_id}")
+        
+        # Add/update node_id to network section
+        if 'network' not in user_config:
+            user_config['network'] = {}
+        user_config['network']['node_id'] = node_id
+        
+        # Write back to user config (atomic)
+        temp_path = user_config_path + '.node_id_tmp.' + str(os.getpid())
+        with open(temp_path, 'w') as f:
+            yaml.dump(user_config, f, default_flow_style=False, sort_keys=False)
+        os.rename(temp_path, user_config_path)
+        
+        print(f"Node ID set in {user_config_path}")
+        
+    except Exception as e:
+        print(f"Warning: Failed to ensure node_id: {e}")
+        # Don't exit - continue with merge even if node_id fails
+
 
 def main():
     # Parse command-line arguments
@@ -66,6 +136,9 @@ def main():
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
                 print(f"User config was created by another process")
+        
+        # Ensure node_id exists and matches hardware (add/update if needed, Pi only)
+        ensure_node_id(user_config_path)
         
         # Overlay user config if it exists and has content
         if os.path.exists(user_config_path):
