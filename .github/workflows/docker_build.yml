@@ -33,7 +33,8 @@ jobs:
             context: .
             image: ghcr.io/offworldlab/blah2
           - name: blah2-api
-            context: ./api
+            context: .
+            dockerfile: api/Dockerfile
             image: ghcr.io/offworldlab/blah2-api
           - name: blah2-web
             context: ./web
@@ -55,6 +56,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile || format('{0}/Dockerfile', matrix.context) }}
           platforms: linux/arm64
           push: false
           load: true
@@ -82,7 +84,20 @@ jobs:
       
       steps:
         - uses: actions/checkout@v4
+
+        # Config merge tests
+        - name: Set up Python
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.11'
         
+        - name: Install Python dependencies
+          run: pip install pyyaml mergedeep
+        
+        - name: Run config merge tests
+          run: python3 -m unittest discover test/infrastructure -v
+        
+        # Image tests
         - uses: docker/setup-qemu-action@v3
           with:
             platforms: arm64
