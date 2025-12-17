@@ -1,7 +1,0 @@
-[submodule "node-infra"]
-	path = node-infra
-	url = https://github.com/offworldlab/node-infra.git
-	branch = main
-[submodule "adsb2dd"]
-	path = adsb2dd
-	url = https://github.com/offworldlabs/adsb2dd.git

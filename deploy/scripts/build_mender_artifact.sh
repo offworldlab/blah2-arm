@@ -85,17 +85,17 @@ SOFTWARE_ARGS=(
 if [ -n "$PREV_VERSION" ]; then
   APP_GEN_ARGS+=(
     --deep-delta
-    --image "ghcr.io/offworldlab/blah2:${PREV_VERSION},ghcr.io/offworldlab/blah2:${VERSION}"
-    --image "ghcr.io/offworldlab/blah2-web:${PREV_VERSION},ghcr.io/offworldlab/blah2-web:${VERSION}"
-    --image "ghcr.io/offworldlab/blah2-api:${PREV_VERSION},ghcr.io/offworldlab/blah2-api:${VERSION}"
-    --image "ghcr.io/offworldlab/blah2-host:${PREV_VERSION},ghcr.io/offworldlab/blah2-host:${VERSION}"
+    --image "ghcr.io/offworldlabs/blah2:${PREV_VERSION},ghcr.io/offworldlabs/blah2:${VERSION}"
+    --image "ghcr.io/offworldlabs/blah2-web:${PREV_VERSION},ghcr.io/offworldlabs/blah2-web:${VERSION}"
+    --image "ghcr.io/offworldlabs/blah2-api:${PREV_VERSION},ghcr.io/offworldlabs/blah2-api:${VERSION}"
+    --image "ghcr.io/offworldlabs/blah2-host:${PREV_VERSION},ghcr.io/offworldlabs/blah2-host:${VERSION}"
   )
 else
   APP_GEN_ARGS+=(
-    --image "ghcr.io/offworldlab/blah2:${VERSION}"
-    --image "ghcr.io/offworldlab/blah2-web:${VERSION}"
-    --image "ghcr.io/offworldlab/blah2-api:${VERSION}"
-    --image "ghcr.io/offworldlab/blah2-host:${VERSION}"
+    --image "ghcr.io/offworldlabs/blah2:${VERSION}"
+    --image "ghcr.io/offworldlabs/blah2-web:${VERSION}"
+    --image "ghcr.io/offworldlabs/blah2-api:${VERSION}"
+    --image "ghcr.io/offworldlabs/blah2-host:${VERSION}"
   )
 fi
 
@@ -126,10 +126,10 @@ cat > "${METADATA_OUT}" <<EOF
   "artifact_size_mb": ${SIZE_MB},
   "delta_enabled": $([ -n "$PREV_VERSION" ] && echo "true" || echo "false"),
   "images": {
-    "blah2": "ghcr.io/offworldlab/blah2:${VERSION}",
-    "blah2-web": "ghcr.io/offworldlab/blah2-web:${VERSION}",
-    "blah2-api": "ghcr.io/offworldlab/blah2-api:${VERSION}",
-    "blah2-host": "ghcr.io/offworldlab/blah2-host:${VERSION}"
+    "blah2": "ghcr.io/offworldlabs/blah2:${VERSION}",
+    "blah2-web": "ghcr.io/offworldlabs/blah2-web:${VERSION}",
+    "blah2-api": "ghcr.io/offworldlabs/blah2-api:${VERSION}",
+    "blah2-host": "ghcr.io/offworldlabs/blah2-host:${VERSION}"
   },
   "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "git_sha": "$(git rev-parse HEAD 2>/dev/null || echo 'unknown')",
