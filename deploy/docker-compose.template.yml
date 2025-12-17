@@ -6,20 +6,20 @@ services:
 
   blah2:
     restart: always
-    image: ghcr.io/offworldlab/blah2:__VERSION__ 
+    image: ghcr.io/offworldlabs/blah2:__VERSION__
     tty: true
-    depends_on: 
+    depends_on:
       - blah2_api
-    volumes: #Persistant storage in /data/ 
+    volumes: #Persistant storage in /data/
       - /data/blah2/config:/opt/blah2/config # Shared config directory (user.yml + debug copies)
       - /data/blah2/save:/opt/blah2/save
 
       - /dev/shm:/dev/shm:rw
-      - /dev/bus/usb:/dev/bus/usb:rw     
-      - /usr/local/lib/libsdrplay_api.so.3.15:/usr/local/lib/libsdrplay_api.so.3:ro 
+      - /dev/bus/usb:/dev/bus/usb:rw
+      - /usr/local/lib/libsdrplay_api.so.3.15:/usr/local/lib/libsdrplay_api.so.3:ro
       - /data/blah2/test:/opt/blah2/test
 
-      - /data/blah2/script/sdrplay-restart.sh:/opt/blah2/sdrplay-restart.sh #@TODO - can we bake this in? 
+      - /data/blah2/script/sdrplay-restart.sh:/opt/blah2/sdrplay-restart.sh #@TODO - can we bake this in?
 
     network_mode: host
     pid: "host"
@@ -31,8 +31,8 @@ services:
 
   blah2_web:
     restart: always
-    image: ghcr.io/offworldlab/blah2-web:__VERSION__
-    ports: 
+    image: ghcr.io/offworldlabs/blah2-web:__VERSION__
+    ports:
       - 49152:80
     networks:
       - blah2
@@ -40,7 +40,7 @@ services:
 
   blah2_api:
     restart: always
-    image: ghcr.io/offworldlab/blah2-api:__VERSION__
+    image: ghcr.io/offworldlabs/blah2-api:__VERSION__
     volumes:
       - /data/blah2/config:/usr/src/app/config # Shared config directory (user.yml + debug copies)
     network_mode: host
@@ -51,7 +51,7 @@ services:
 
   blah2_host:
     restart: always
-    image: ghcr.io/offworldlab/blah2-host:__VERSION__
+    image: ghcr.io/offworldlabs/blah2-host:__VERSION__
     ports:
       - "8080:80"
     networks:

@@ -31,17 +31,17 @@ jobs:
         include:
           - name: blah2
             context: .
-            image: ghcr.io/offworldlab/blah2
+            image: ghcr.io/offworldlabs/blah2
           - name: blah2-api
             context: .
             dockerfile: api/Dockerfile
-            image: ghcr.io/offworldlab/blah2-api
+            image: ghcr.io/offworldlabs/blah2-api
           - name: blah2-web
             context: ./web
-            image: ghcr.io/offworldlab/blah2-web
+            image: ghcr.io/offworldlabs/blah2-web
           - name: blah2-host
             context: ./host
-            image: ghcr.io/offworldlab/blah2-host
+            image: ghcr.io/offworldlabs/blah2-host
 
     steps:
       - uses: actions/checkout@v4
@@ -150,13 +150,13 @@ jobs:
       matrix:
         include:
           - name: blah2
-            image: ghcr.io/offworldlab/blah2
+            image: ghcr.io/offworldlabs/blah2
           - name: blah2-api
-            image: ghcr.io/offworldlab/blah2-api
+            image: ghcr.io/offworldlabs/blah2-api
           - name: blah2-web
-            image: ghcr.io/offworldlab/blah2-web
+            image: ghcr.io/offworldlabs/blah2-web
           - name: blah2-host
-            image: ghcr.io/offworldlab/blah2-host
+            image: ghcr.io/offworldlabs/blah2-host
     
     steps:
       - uses: docker/setup-qemu-action@v3
