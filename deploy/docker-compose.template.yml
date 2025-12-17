@@ -22,6 +22,7 @@ services:
       - /data/blah2/script/sdrplay-restart.sh:/opt/blah2/sdrplay-restart.sh #@TODO - can we bake this in? 
 
     network_mode: host
+    pid: "host"
     privileged: true
     # Command: restart SDR -> merge configs (default.yml + user.yml + forced.yml) -> start app
     # Config merge: reads /opt/blah2/config/user.yml, writes internal /opt/blah2/config.yml + debug copy out
