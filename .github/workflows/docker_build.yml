@@ -81,22 +81,10 @@ jobs:
   test:
       needs: build
       runs-on: ubuntu-latest
-      
+
       steps:
         - uses: actions/checkout@v4
 
-        # Config merge tests
-        - name: Set up Python
-          uses: actions/setup-python@v5
-          with:
-            python-version: '3.11'
-        
-        - name: Install Python dependencies
-          run: pip install pyyaml mergedeep
-        
-        - name: Run config merge tests
-          run: python3 -m unittest discover test/infrastructure -v
-        
         # Image tests
         - uses: docker/setup-qemu-action@v3
           with:
@@ -138,8 +126,8 @@ jobs:
         
         - name: Run tests
           run: |
-            chmod +x deploy/scripts/test_images.sh
-            ./deploy/scripts/test_images.sh ${{ inputs.tag }}
+            chmod +x script/test_images.sh
+            ./script/test_images.sh ${{ inputs.tag }}
 
   publish:
     needs: test

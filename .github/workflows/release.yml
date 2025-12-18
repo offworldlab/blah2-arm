@@ -9,98 +9,43 @@ on:
       version:
         description: "Release version (e.g., v1.0.0, dev)"
         required: true
-      previous_version:
-        description: "Previous version for delta updates (optional)"
-        required: false
 
 jobs:
-  build-images:
-    name: Build and push Docker images
+  build-and-publish:
+    name: Build, test, and publish Docker images
     uses: ./.github/workflows/docker_build.yml
     with:
       tag: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
       publish: "true"
-  
-  build-artifact:
-    name: Build Mender artifact
-    needs: build-images
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-and-publish
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    
+    permissions: { contents: write }
+
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install Mender tools
-        run: |
-          # Install xdelta3 for delta updates
-          sudo apt-get update
-          sudo apt-get install -y xdelta3
 
-          # Install OpenSSL 1.1 for mender-artifact compatibility
-          wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          
-          # Install mender-artifact
-          wget https://downloads.mender.io/mender-artifact/3.11.2/linux/mender-artifact
-          chmod +x mender-artifact
-          sudo mv mender-artifact /usr/local/bin/
-          
-          # Install app-gen
-          wget https://raw.githubusercontent.com/mendersoftware/app-update-module/1.1.0/gen/app-gen
-          chmod +x app-gen
-          sudo mv app-gen /usr/local/bin/
-      
-      - name: Set version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "prev_version=" >> $GITHUB_OUTPUT
-          else
-            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
-            echo "prev_version=${{ inputs.previous_version }}" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Build Mender artifact
-        run: |
-          chmod +x deploy/scripts/build_mender_artifact.sh
-          ./deploy/scripts/build_mender_artifact.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.prev_version }}"
-      
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: mender-release-${{ steps.version.outputs.version }}
-          path: |
-            artifacts/*.mender
-            artifacts/*.json
-            manifests/${{ steps.version.outputs.version }}/docker-compose.yaml
-          retention-days: 90
-      
-      - name: Summary
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          echo "## Release ${VERSION}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Artifact: \`artifacts/blah2-stack-${VERSION}.mender\`" >> $GITHUB_STEP_SUMMARY
-          SIZE=$(jq -r '.artifact_size_mb' artifacts/blah2-stack-${VERSION}.json)
-          echo "Size: ${SIZE}MB" >> $GITHUB_STEP_SUMMARY
-          if [ -n "${{ steps.version.outputs.prev_version }}" ]; then
-            echo "Delta: ${{ steps.version.outputs.prev_version }} → ${VERSION}" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Upload to GitHub Release
-        if: github.event_name == 'push'
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/blah2-stack-${{ steps.version.outputs.version }}.mender
-            artifacts/blah2-stack-${{ steps.version.outputs.version }}.json
-            manifests/${{ steps.version.outputs.version }}/docker-compose.yaml
-          fail_on_unmatched_files: true
+          generate_release_notes: true
+          body: |
+            ## Docker Images Published
 
-      - name: Upload to Mender
-        if: github.event_name == 'push'
-        uses: mendersoftware/mender-gh-action-upload-artifact@master
-        with:
-          mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN_APP }}
-          mender_uri: https://hosted.mender.io
-          mender_artifact: artifacts/blah2-stack-${{ steps.version.outputs.version }}.mender
+            All images have been built, tested, and published to GitHub Container Registry:
+
+            - `ghcr.io/offworldlabs/blah2:${{ github.ref_name }}`
+            - `ghcr.io/offworldlabs/blah2-api:${{ github.ref_name }}`
+            - `ghcr.io/offworldlabs/blah2-web:${{ github.ref_name }}`
+            - `ghcr.io/offworldlabs/blah2-host:${{ github.ref_name }}`
+
+            Pull images with:
+            ```bash
+            docker pull ghcr.io/offworldlabs/blah2:${{ github.ref_name }}
+            docker pull ghcr.io/offworldlabs/blah2-api:${{ github.ref_name }}
+            docker pull ghcr.io/offworldlabs/blah2-web:${{ github.ref_name }}
+            docker pull ghcr.io/offworldlabs/blah2-host:${{ github.ref_name }}
+            ```

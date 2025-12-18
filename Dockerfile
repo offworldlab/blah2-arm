@@ -33,9 +33,6 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
 
-# install dependencies for config merging
-RUN pip3 install --break-system-packages pyyaml mergedeep
-
 # install dependencies from vcpkg
 ENV VCPKG_ROOT=/opt/vcpkg
 ENV CC=/usr/bin/gcc
@@ -82,14 +79,6 @@ ADD src src
 ADD test test
 ADD script script
 ADD CMakeLists.txt CMakePresets.json Doxyfile ./
-
-# Copy config files into container (baked in, not mounted)
-RUN mkdir -p /opt/blah2/defaults
-COPY config/default.yml /opt/blah2/defaults/default.yml
-COPY config/forced.yml /opt/blah2/defaults/forced.yml
-
-# Make merge config script executable
-RUN chmod +x /opt/blah2/script/merge_config.py
 
 # Updated build step to use the correct binary location
 RUN set -ex \
