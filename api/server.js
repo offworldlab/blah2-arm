@@ -328,39 +328,42 @@ async function getCachedAircraft() {
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received.');
   process.exit(0);
-});app.get('/api/adsb2dd', (req, res) => {
+});
+
+// Compute ADS-B aircraft positions in delay-doppler coordinates
+app.get('/api/adsb2dd', async (req, res) => {
   if (config.truth.adsb.enabled == true) {
-    const api_url = "http://" + config.truth.adsb.adsb2dd + "/api/dd";
-    const api_query =
-      api_url +
-      "?rx=" + config.location.rx.latitude + "," +
-      config.location.rx.longitude + "," +
-      config.location.rx.altitude +
-      "&tx=" + config.location.tx.latitude + "," +
-      config.location.tx.longitude + "," +
-      config.location.tx.altitude +
-      "&fc=" + (config.capture.fc / 1000000) +
-      "&server=" + "http://" + config.truth.adsb.tar1090;
-    
-    // Fetch data from adsb2dd
-    http.get(api_query, (resp) => {
-      let data = '';
-      resp.on('data', (chunk) => {
-        data += chunk;
-      });
-      resp.on('end', () => {
-        try {
-          const jsonData = JSON.parse(data);
-          res.json(jsonData);
-        } catch (error) {
-          console.error('Error parsing adsb2dd response:', error);
-          res.json({});
-        }
-      });
-    }).on('error', (err) => {
-      console.error('Error fetching from adsb2dd:', err.message);
+    try {
+      const aircraft = await getCachedAircraft();
+      const result = {};
+
+      for (const ac of aircraft) {
+        if (!ac.lat || !ac.lon || !ac.alt_baro) continue;
+
+        const delay = bistatic.computeBistaticDelay(ac, config.location.rx, config.location.tx);
+        const doppler = bistatic.computeBistaticDoppler(ac, config.location.rx, config.location.tx, config.capture.fc);
+
+        if (delay === null || doppler === null) continue;
+
+        // Use hex code as key, with flight callsign if available
+        const key = ac.hex || 'unknown';
+        result[key] = {
+          delay: Math.round(delay * 100) / 100,
+          doppler: Math.round(doppler * 100) / 100,
+          flight: ac.flight ? ac.flight.trim() : ac.hex,
+          lat: ac.lat,
+          lon: ac.lon,
+          alt_baro: ac.alt_baro,
+          gs: ac.gs,
+          track: ac.track
+        };
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error computing adsb2dd:', error.message);
       res.json({});
-    });
+    }
   }
   else {
     res.status(400).end();
