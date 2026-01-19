@@ -95,3 +95,24 @@ RUN set -ex \
     && chmod +x /blah2/bin/blah2
 
 WORKDIR /blah2/bin
+
+# =============================================================================
+# Stage 3: Runtime (DEFAULT - this is what gets deployed)
+# Minimal image with only the binary and runtime libraries
+# For full build environment: docker build --target blah2 -t blah2:dev .
+# =============================================================================
+FROM debian:bookworm-slim as runtime
+LABEL maintainer="Jehan <jehan.azad@gmail.com>"
+LABEL org.opencontainers.image.source https://github.com/30hours/blah2
+
+# Install only runtime dependencies (no dev packages, no compilers)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libfftw3-double3 \
+    libgfortran5 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the compiled binary from build stage
+COPY --from=blah2 /blah2/bin/blah2 /blah2/bin/blah2
+
+WORKDIR /blah2/bin
