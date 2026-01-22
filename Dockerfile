@@ -69,7 +69,6 @@ RUN export ARCH=$(uname -m) \
     && chmod 644 /usr/local/lib/libsdrplay_api.so.${MAJVER} 
 
 
-
 FROM blah2_env as blah2
 LABEL maintainer="Jehan <jehan.azad@gmail.com>"
 
@@ -113,6 +112,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the compiled binary from build stage
-COPY --from=blah2 /blah2/bin/blah2 /blah2/bin/blah2
+COPY --from=blah2 /blah2/bin/blah2 /opt/blah2/bin/blah2
 
-WORKDIR /blah2/bin
+WORKDIR /opt/blah2/bin
