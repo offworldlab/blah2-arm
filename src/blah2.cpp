@@ -34,6 +34,7 @@
 #include <atomic>
 #include <memory>
 #include <iostream>
+#include <cstdlib>
 
 Capture *CAPTURE_POINTER = NULL;
 
@@ -85,6 +86,14 @@ int main(int argc, char **argv)
     capture->set_replay(loop, replayFile);
   }
 
+  // Check BLAH2_VERBOSE env var for logging control
+  bool verbose = false;
+  const char* verboseEnv = std::getenv("BLAH2_VERBOSE");
+  if (verboseEnv != nullptr && std::string(verboseEnv) == "true")
+  {
+    verbose = true;
+  }
+
   // create shared queue
   double tCpi, tBuffer;
   tree["process"]["data"]["cpi"] >> tCpi;
@@ -93,8 +102,8 @@ int main(int argc, char **argv)
   IqData *buffer2 = new IqData((int) (tCpi*tBuffer*fs));
 
   // run capture
-  std::thread t1([&]{capture->process(buffer1, buffer2, 
-    tree["capture"]["device"], ip_capture, port_capture);
+  std::thread t1([&]{capture->process(buffer1, buffer2,
+    tree["capture"]["device"], ip_capture, port_capture, verbose);
   });
 
   // setup process CPI
@@ -312,7 +321,10 @@ int main(int argc, char **argv)
           double delta_ms = (double)(time.back()-time[0]) / 1000;
           timing_name.push_back("cpi");
           timing_time.push_back(delta_ms);
-          std::cout << "CPI time (ms): " << delta_ms << std::endl;
+          if (verbose)
+          {
+            std::cout << "CPI time (ms): " << delta_ms << std::endl;
+          }
 
           // output timing data
           timing->update(time[0]/1000, timing_time, timing_name);

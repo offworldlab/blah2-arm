@@ -158,11 +158,12 @@ public:
   /// @brief Constructor.
   /// @param fc Center frequency (Hz).
   /// @param path Path to save IQ data.
+  /// @param verbose Enable verbose stats logging.
   /// @return The object.
-  RspDuo(std::string type, uint32_t fc, uint32_t fs, 
-    std::string path, bool *saveIq, int agcSetPoint, 
-    int bandwidthNumber, int gainReduction, 
-    int lnaState, bool dabNotch, bool rfNotch);
+  RspDuo(std::string type, uint32_t fc, uint32_t fs,
+    std::string path, bool *saveIq, int agcSetPoint,
+    int bandwidthNumber, int gainReduction,
+    int lnaState, bool dabNotch, bool rfNotch, bool verbose = false);
 
   /// @brief Implement capture function on RSPduo.
   /// @param buffer1 Pointer to reference buffer.

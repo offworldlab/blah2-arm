@@ -65,12 +65,13 @@ public:
   /// @param config Yaml config for device.
   /// @param ip_capture IP address of capture API.
   /// @param port_capture Port of capture API.
+  /// @param verbose Enable verbose logging output.
   /// @return Void.
-  void process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config, 
-    std::string ip_capture, uint16_t port_capture);
+  void process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
+    std::string ip_capture, uint16_t port_capture, bool verbose = false);
 
-  std::unique_ptr<Source> factory_source(const std::string& type, 
-    c4::yml::NodeRef config);
+  std::unique_ptr<Source> factory_source(const std::string& type,
+    c4::yml::NodeRef config, bool verbose = false);
 
   /// @brief Set parameters to enable file replay.
   /// @param loop True if replay file should loop when complete.
