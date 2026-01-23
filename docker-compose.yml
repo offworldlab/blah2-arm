@@ -11,8 +11,10 @@ services:
     build: .
     image: blah2
     tty: true
-    depends_on: 
+    depends_on:
       - blah2_api
+    environment:
+      - BLAH2_VERBOSE=false
     volumes:
       - /opt/blah2/config:/opt/blah2/config
       - /opt/blah2/save:/opt/blah2/save

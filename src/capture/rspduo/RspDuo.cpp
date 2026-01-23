@@ -42,13 +42,14 @@ IqData *buffer1;
 IqData *buffer2;
 
 // constructor
-RspDuo::RspDuo(std::string _type, uint32_t _fc, 
+RspDuo::RspDuo(std::string _type, uint32_t _fc,
   uint32_t _fs, std::string _path, bool *_saveIq,
-  int _agcSetPoint, int _bandwidthNumber, 
+  int _agcSetPoint, int _bandwidthNumber,
   int _gainReduction, int _lnaState,
-  bool _dabNotch, bool _rfNotch)
+  bool _dabNotch, bool _rfNotch, bool _verbose)
   : Source(_type, _fc, _fs, _path, _saveIq)
 {
+  stats_fg = _verbose;
   std::unordered_map<int, int> decimationMap = {
     {2000000, 1},
     {1000000, 2},

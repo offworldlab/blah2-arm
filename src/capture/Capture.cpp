@@ -18,12 +18,12 @@ Capture::Capture(std::string _type, uint32_t _fs, uint32_t _fc, std::string _pat
   saveIq = false;
 }
 
-void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config, 
-  std::string ip_capture, uint16_t port_capture)
+void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
+  std::string ip_capture, uint16_t port_capture, bool verbose)
 {
   std::cout << "Setting up device " + type << std::endl;
 
-  device = factory_source(type, config);
+  device = factory_source(type, config, verbose);
 
   // capture status thread
   std::thread t1([&]{
@@ -62,7 +62,7 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
   t1.join();
 }
 
-std::unique_ptr<Source> Capture::factory_source(const std::string& type, c4::yml::NodeRef config)
+std::unique_ptr<Source> Capture::factory_source(const std::string& type, c4::yml::NodeRef config, bool verbose)
 {
     // SDRplay RSPduo
     if (type == VALID_TYPE[0])
@@ -77,7 +77,7 @@ std::unique_ptr<Source> Capture::factory_source(const std::string& type, c4::yml
         config["rfNotch"] >> rfNotch;
         return std::make_unique<RspDuo>(type, fc, fs, path, &saveIq,
           agcSetPoint, bandwidthNumber, gainReduction, lnaState,
-          dabNotch, rfNotch);
+          dabNotch, rfNotch, verbose);
     }
 
     // handle unknown type
