@@ -2,7 +2,7 @@
 
 This is fork of blah2, modified to run on a Raspberry Pi 5 with an RSPDuo.
 
-The default dockerfire has been optimized to build faster by only installing the RSPDuo dependencies. If you would like to use another SDR, rename the following files to remove the .all:
+The default dockerfile has been optimized to build faster by only installing the RSPDuo dependencies. If you would like to use another SDR, rename the following files to remove the .all:
 
 blah2-arm/CMakeLists.all.txt
 blah2-arm/Dockerfile.all
