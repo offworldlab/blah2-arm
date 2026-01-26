@@ -1,3 +1,8 @@
+# blah2 default configuration
+# Note: Config merging (default/user/forced) is handled by retina-node at deployment time. 
+# Ensure new defaults for deployment are added in there.
+# This file contains defaults for standalone/development use.
+
 capture:
   fs: 2000000
   fc: 503000000
