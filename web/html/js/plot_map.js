@@ -217,4 +217,4 @@ var intervalId = window.setInterval(function () {
     })
     .always(function () {
     });
-}, 100);
+}, 1000);
