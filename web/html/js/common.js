@@ -1,6 +1,6 @@
 function is_localhost(ip) {
-  
-  if (ip === 'localhost') {
+
+  if (ip === 'localhost' || ip.endsWith('.local')) {
     return true;
   }
   

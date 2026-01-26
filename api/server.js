@@ -60,7 +60,9 @@ connectToTracker();
 
 // constants
 const PORT = config.network.ports.api;
-const HOST = config.network.ip;
+// Use '::' for IPv6 dual-stack to support mDNS .local access from IPv6 clients
+// (config.network.ip is used by blah2 core for internal TCP connections, not API listen)
+const HOST = '::';
 var map = '';
 var detection = '';
 var track = '';

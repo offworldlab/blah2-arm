@@ -1,4 +1,4 @@
-FROM node:20
+FROM node:20-slim
 
 LABEL maintainer="30hours <nathan@30hours.dev>"
 LABEL org.opencontainers.image.source https://github.com/30hours/blah2
