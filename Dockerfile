@@ -120,6 +120,3 @@ COPY sdrplay-restart.sh /opt/blah2/sdrplay-restart.sh
 RUN chmod +x /opt/blah2/sdrplay-restart.sh
 
 WORKDIR /opt/blah2/bin
-
-# Default command runs restart script then blah2
-CMD ["/bin/bash", "-c", "/opt/blah2/sdrplay-restart.sh && /opt/blah2/bin/blah2"]
