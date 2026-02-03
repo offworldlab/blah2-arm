@@ -30,8 +30,8 @@ jobs:
   create-release:
     name: Create GitHub Release
     needs: [build-blah2, build-frontend]
-    # Only create releases for version tags, not dev
-    if: github.event_name == 'push' && startsWith(github.ref_name, 'v')
+    # Only create releases for proper version tags (not dev or rc)
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'v') && !contains(github.ref_name, '-')
     runs-on: ubuntu-latest
     permissions: { contents: write }
 
