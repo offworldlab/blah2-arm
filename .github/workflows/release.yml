@@ -3,7 +3,9 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # Automatic on tags e.g. v0.1.0, v1.0.0
+      - 'v*.*.*'      # Release tags e.g. v0.1.0, v1.0.0
+      - 'v*.*.*-rc*'  # Release candidates e.g. v0.3.0-rc1
+      - 'dev'         # Development builds
   workflow_dispatch:  # Manual trigger
     inputs:
       version:
@@ -28,7 +30,8 @@ jobs:
   create-release:
     name: Create GitHub Release
     needs: [build-blah2, build-frontend]
-    if: github.event_name == 'push'
+    # Only create releases for proper version tags (not dev or rc)
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'v') && !contains(github.ref_name, '-')
     runs-on: ubuntu-latest
     permissions: { contents: write }
 

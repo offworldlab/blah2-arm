@@ -108,10 +108,15 @@ LABEL org.opencontainers.image.source https://github.com/30hours/blah2
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libfftw3-double3 \
     libgfortran5 \
+    procps \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the compiled binary from build stage
 COPY --from=blah2 /blah2/bin/blah2 /opt/blah2/bin/blah2
+
+# Copy SDRplay restart script (requires pid:host at runtime)
+COPY sdrplay-restart.sh /opt/blah2/sdrplay-restart.sh
+RUN chmod +x /opt/blah2/sdrplay-restart.sh
 
 WORKDIR /opt/blah2/bin
