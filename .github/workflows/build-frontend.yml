@@ -25,7 +25,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm  # Native ARM runner
     permissions: { contents: read, packages: write }
     strategy:
       fail-fast: false
@@ -47,23 +47,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
       - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build ${{ matrix.name }}
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          platforms: linux/arm64
           push: false
           load: true
           tags: ${{ matrix.name }}:${{ inputs.tag }}
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          cache-from: type=registry,ref=${{ matrix.image }}:cache
+          cache-to: type=registry,ref=${{ matrix.image }}:cache,mode=max
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -80,14 +81,10 @@ jobs:
 
   test:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm  # Native ARM runner
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
 
       - name: Download blah2-api image
         uses: actions/download-artifact@v4
@@ -130,7 +127,7 @@ jobs:
         run: |
           echo "Testing blah2-api..."
           if [ -f "config/config.yml" ]; then
-            docker run --rm -d --name test-blah2-api --platform linux/arm64 \
+            docker run --rm -d --name test-blah2-api  \
               -v $(pwd)/config:/usr/src/app/config \
               blah2-api:${{ inputs.tag }} node server.js /usr/src/app/config/config.yml
             sleep 5
@@ -150,7 +147,7 @@ jobs:
       - name: Test blah2-web startup
         run: |
           echo "Testing blah2-web..."
-          docker run --rm -d --name test-blah2-web --platform linux/arm64 blah2-web:${{ inputs.tag }}
+          docker run --rm -d --name test-blah2-web  blah2-web:${{ inputs.tag }}
           sleep 3
           if docker ps | grep -q test-blah2-web; then
             echo "blah2-web starts successfully"
@@ -165,7 +162,7 @@ jobs:
       - name: Test blah2-host startup
         run: |
           echo "Testing blah2-host..."
-          docker run --rm -d --name test-blah2-host --platform linux/arm64 blah2-host:${{ inputs.tag }}
+          docker run --rm -d --name test-blah2-host  blah2-host:${{ inputs.tag }}
           sleep 3
           if docker ps | grep -q test-blah2-host; then
             echo "blah2-host starts successfully"
@@ -180,7 +177,7 @@ jobs:
   publish:
     needs: test
     if: ${{ inputs.publish == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm  # Native ARM runner
     permissions: { contents: read, packages: write }
     strategy:
       matrix:
@@ -193,10 +190,6 @@ jobs:
             image: ghcr.io/offworldlabs/blah2-host
 
     steps:
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
