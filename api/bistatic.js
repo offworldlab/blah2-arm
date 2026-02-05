@@ -40,10 +40,11 @@ function enuToEcef(vel_e, vel_n, vel_u, lat_rad, lon_rad) {
 }
 
 function computeBistaticDelay(aircraft, rx, tx) {
-  if (!aircraft.lat || !aircraft.lon || !aircraft.alt_baro) {
+  const alt_ft = aircraft.alt_geom ?? aircraft.alt_baro;
+  if (!aircraft.lat || !aircraft.lon || !alt_ft) {
     return null;
   }
-  const alt_m = ft2m(aircraft.alt_baro);
+  const alt_m = ft2m(alt_ft);
   const ecefAircraft = lla2ecef(aircraft.lat, aircraft.lon, alt_m);
   const ecefRx = lla2ecef(rx.latitude, rx.longitude, rx.altitude);
   const ecefTx = lla2ecef(tx.latitude, tx.longitude, tx.altitude);
@@ -67,10 +68,11 @@ function computeBistaticDelay(aircraft, rx, tx) {
 }
 
 function computeBistaticDoppler(aircraft, rx, tx, fc) {
-  if (!aircraft.lat || !aircraft.lon || !aircraft.alt_baro || !aircraft.gs || !aircraft.track) {
+  const alt_ft = aircraft.alt_geom ?? aircraft.alt_baro;
+  if (!aircraft.lat || !aircraft.lon || !alt_ft || !aircraft.gs || !aircraft.track) {
     return null;
   }
-  const alt_m = ft2m(aircraft.alt_baro);
+  const alt_m = ft2m(alt_ft);
   const ecefAircraft = lla2ecef(aircraft.lat, aircraft.lon, alt_m);
   const ecefRx = lla2ecef(rx.latitude, rx.longitude, rx.altitude);
   const ecefTx = lla2ecef(tx.latitude, tx.longitude, tx.altitude);

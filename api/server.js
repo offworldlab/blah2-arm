@@ -5,6 +5,7 @@ const yaml = require('js-yaml');
 const dns = require('dns');
 const http = require('http');
 const bistatic = require('./bistatic.js');
+const { extrapolateAdsbData } = require('./lib/extrapolation');
 
 // parse config file
 var config;
@@ -170,7 +171,7 @@ const server_detection = net.createServer((socket)=>{
               let bestMatch = null;
               let bestScore = Infinity;
               for (const ac of aircraft) {
-                if (!ac.lat || !ac.lon || !ac.alt_baro) continue;
+                if (!ac.lat || !ac.lon || (!ac.alt_geom && !ac.alt_baro)) continue;
                 const expected_delay = bistatic.computeBistaticDelay(ac,
                   config.location.rx, config.location.tx);
                 const expected_doppler = bistatic.computeBistaticDoppler(ac,
@@ -188,7 +189,7 @@ const server_detection = net.createServer((socket)=>{
                       hex: ac.hex,
                       lat: ac.lat,
                       lon: ac.lon,
-                      alt_baro: ac.alt_baro,
+                      alt: ac.alt_geom ?? ac.alt_baro,
                       gs: ac.gs,
                       track: ac.track,
                       expected_delay: Math.round(expected_delay * 100) / 100,
@@ -350,10 +351,44 @@ process.on('SIGTERM', () => {
       });
       resp.on('end', () => {
         try {
-          const jsonData = JSON.parse(data);
-          res.json(jsonData);
+          const adsbData = JSON.parse(data);
+          
+          // Get detection timestamp for synchronization
+          let detectionTimestamp = Date.now() / 1000; // Default to current time
+          try {
+            if (detection) {
+              const detectionData = JSON.parse(detection);
+              if (detectionData.timestamp) {
+                detectionTimestamp = detectionData.timestamp / 1000; // Convert ms to seconds
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing detection timestamp:', e.message);
+          }
+          
+          // Extrapolate ADSB positions to detection timestamp
+          const rxPos = {
+            lat: config.location.rx.latitude,
+            lon: config.location.rx.longitude,
+            alt: config.location.rx.altitude
+          };
+          const txPos = {
+            lat: config.location.tx.latitude,
+            lon: config.location.tx.longitude,
+            alt: config.location.tx.altitude
+          };
+          
+          const synchronized = extrapolateAdsbData(
+            adsbData,
+            detectionTimestamp,
+            rxPos,
+            txPos,
+            config.capture.fc
+          );
+          
+          res.json(synchronized);
         } catch (error) {
-          console.error('Error parsing adsb2dd response:', error);
+          console.error('Error processing adsb2dd response:', error);
           res.json({});
         }
       });
