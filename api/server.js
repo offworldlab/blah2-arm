@@ -331,80 +331,72 @@ async function getCachedAircraft() {
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received.');
   process.exit(0);
-});app.get('/api/adsb2dd', (req, res) => {
+});app.get('/api/adsb2dd', async (req, res) => {
   if (config.truth.adsb.enabled == true) {
-    const api_url = "http://" + config.truth.adsb.adsb2dd + "/api/dd";
-    const api_query =
-      api_url +
-      "?rx=" + config.location.rx.latitude + "," +
-      config.location.rx.longitude + "," +
-      config.location.rx.altitude +
-      "&tx=" + config.location.tx.latitude + "," +
-      config.location.tx.longitude + "," +
-      config.location.tx.altitude +
-      "&fc=" + (config.capture.fc / 1000000) +
-      "&server=" + "http://" + config.truth.adsb.tar1090;
-    
-    // Fetch data from adsb2dd
-    http.get(api_query, (resp) => {
-      let data = '';
-      resp.on('data', (chunk) => {
-        data += chunk;
-      });
-      resp.on('end', () => {
-        try {
-          const adsbData = JSON.parse(data);
+    try {
+      // Get aircraft data directly from tar1090 (has full position/velocity)
+      const aircraft = await getCachedAircraft();
 
-          // Convert adsb2dd timestamps from milliseconds to seconds
-          for (const hexId in adsbData) {
-            if (adsbData[hexId].timestamp) {
-              adsbData[hexId].timestamp = adsbData[hexId].timestamp / 1000;
-            }
+      // Get detection timestamp for synchronization
+      let detectionTimestamp = Date.now() / 1000; // Default to current time
+      try {
+        if (detection) {
+          const detectionData = JSON.parse(detection);
+          if (detectionData.timestamp) {
+            detectionTimestamp = detectionData.timestamp / 1000; // Convert ms to seconds
           }
-
-          // Get detection timestamp for synchronization
-          let detectionTimestamp = Date.now() / 1000; // Default to current time
-          try {
-            if (detection) {
-              const detectionData = JSON.parse(detection);
-              if (detectionData.timestamp) {
-                detectionTimestamp = detectionData.timestamp / 1000; // Convert ms to seconds
-              }
-            }
-          } catch (e) {
-            console.error('Error parsing detection timestamp:', e.message);
-          }
-          
-          // Extrapolate ADSB positions to detection timestamp
-          const rxPos = {
-            lat: config.location.rx.latitude,
-            lon: config.location.rx.longitude,
-            alt: config.location.rx.altitude
-          };
-          const txPos = {
-            lat: config.location.tx.latitude,
-            lon: config.location.tx.longitude,
-            alt: config.location.tx.altitude
-          };
-          
-          const synchronized = extrapolateAdsbData(
-            adsbData,
-            detectionTimestamp,
-            rxPos,
-            txPos,
-            config.capture.fc
-          );
-          
-          res.json(synchronized);
-        } catch (error) {
-          console.error('Error processing adsb2dd response:', error);
-          res.json({});
         }
-      });
-    }).on('error', (err) => {
-      console.error('Error fetching from adsb2dd:', err.message);
+      } catch (e) {
+        console.error('Error parsing detection timestamp:', e.message);
+      }
+
+      // Convert aircraft array to object keyed by hex
+      const adsbData = {};
+      for (const ac of aircraft) {
+        if (!ac.hex) continue;
+
+        // Calculate timestamp from tar1090 data (now - seen_pos)
+        const timestamp = Date.now() / 1000 - (ac.seen_pos || 0);
+
+        adsbData[ac.hex] = {
+          hex: ac.hex,
+          flight: ac.flight || '',
+          timestamp: timestamp,
+          lat: ac.lat,
+          lon: ac.lon,
+          alt_geom: ac.alt_geom,
+          alt_baro: ac.alt_baro,
+          gs: ac.gs,
+          track: ac.track,
+          geom_rate: ac.geom_rate
+        };
+      }
+
+      // Extrapolate ADSB positions to detection timestamp
+      const rxPos = {
+        lat: config.location.rx.latitude,
+        lon: config.location.rx.longitude,
+        alt: config.location.rx.altitude
+      };
+      const txPos = {
+        lat: config.location.tx.latitude,
+        lon: config.location.tx.longitude,
+        alt: config.location.tx.altitude
+      };
+
+      const synchronized = extrapolateAdsbData(
+        adsbData,
+        detectionTimestamp,
+        rxPos,
+        txPos,
+        config.capture.fc
+      );
+
+      res.json(synchronized);
+    } catch (error) {
+      console.error('Error in /api/adsb2dd:', error);
       res.json({});
-    });
+    }
   }
   else {
     res.status(400).end();
