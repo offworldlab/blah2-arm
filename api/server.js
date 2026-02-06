@@ -354,7 +354,14 @@ process.on('SIGTERM', () => {
       resp.on('end', () => {
         try {
           const adsbData = JSON.parse(data);
-          
+
+          // Convert adsb2dd timestamps from milliseconds to seconds
+          for (const hexId in adsbData) {
+            if (adsbData[hexId].timestamp) {
+              adsbData[hexId].timestamp = adsbData[hexId].timestamp / 1000;
+            }
+          }
+
           // Get detection timestamp for synchronization
           let detectionTimestamp = Date.now() / 1000; // Default to current time
           try {
