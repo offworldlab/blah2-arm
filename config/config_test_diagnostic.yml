@@ -1,7 +1,5 @@
-# blah2 default configuration
-# Note: Config merging (default/user/forced) is handled by retina-node at deployment time. 
-# Ensure new defaults for deployment are added in there.
-# This file contains defaults for standalone/development use.
+# blah2 test configuration - DIAGNOSTIC MODE
+# This config enables side-by-side comparison of both methods
 
 capture:
   fs: 2000000
@@ -64,7 +62,6 @@ network:
 
   node_id: "ret7dd2cb0d"
 
-  # Forward detections to external tracker container
   tracker_forward:
     enabled: false
     host: 'blah2_tracker'
@@ -76,7 +73,7 @@ truth:
     tar1090: 'sfo1.retnode.com'
     adsb2dd: 'localhost:49155'
     use_legacy_method: false
-    diagnostic_mode: false
+    diagnostic_mode: true  # DIAGNOSTIC: Compare both methods
     delay_tolerance: 2.0
     doppler_tolerance: 5.0
   ais:
