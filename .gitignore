@@ -12,3 +12,14 @@ save/*
 artifacts/
 manifests/
 test-config/
+
+# A/B testing local documentation and scripts
+TESTING_AB.md
+DEPLOYMENT_VERIFICATION.md
+QUICK_VERIFY.sh
+REMOTE_VERIFICATION.md
+api/DIAGNOSTIC_MODE.md
+api/QUICK_TEST.md
+api/test_ab.sh
+api/DIAGNOSTIC_QUICK_START.sh
+api/PRE_DEPLOY_TEST.sh

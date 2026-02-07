@@ -331,74 +331,206 @@ async function getCachedAircraft() {
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received.');
   process.exit(0);
-});app.get('/api/adsb2dd', async (req, res) => {
-  if (config.truth.adsb.enabled == true) {
-    try {
-      // Get aircraft data directly from tar1090 (has full position/velocity)
-      const aircraft = await getCachedAircraft();
+});
 
-      // Get detection timestamp for synchronization
-      let detectionTimestamp = Date.now() / 1000; // Default to current time
-      try {
-        if (detection) {
-          const detectionData = JSON.parse(detection);
-          if (detectionData.timestamp) {
-            detectionTimestamp = detectionData.timestamp / 1000; // Convert ms to seconds
-          }
+function buildAdsbQuery(api_url, config) {
+  const rx_str = `${config.location.rx.latitude},${config.location.rx.longitude},${config.location.rx.altitude}`;
+  const tx_str = `${config.location.tx.latitude},${config.location.tx.longitude},${config.location.tx.altitude}`;
+  const fc_mhz = Math.round(config.capture.fc / 1000000);
+  const server_url = `http://${config.truth.adsb.tar1090}`;
+
+  const params = new URLSearchParams({
+    server: server_url,
+    rx: rx_str,
+    tx: tx_str,
+    fc: fc_mhz
+  });
+
+  return `${api_url}?${params.toString()}`;
+}
+
+async function fetchJson(url) {
+  return new Promise((resolve) => {
+    const req = http.get(url, { timeout: HTTP_TIMEOUT }, (resp) => {
+      let data = '';
+      resp.on('data', (chunk) => { data += chunk; });
+      resp.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          console.error('Error parsing response:', e.message);
+          resolve({});
         }
-      } catch (e) {
-        console.error('Error parsing detection timestamp:', e.message);
+      });
+    }).on('error', (err) => {
+      console.error('HTTP request error:', err.message);
+      resolve({});
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      console.error('Request timeout after', HTTP_TIMEOUT, 'ms');
+      resolve({});
+    });
+  });
+}
+
+async function fetchFromAdsbService() {
+  const api_url = "http://" + config.truth.adsb.adsb2dd + "/api/dd";
+  const api_query = buildAdsbQuery(api_url, config);
+  const response = await fetchJson(api_query);
+  return response;
+}
+
+function compareAdsbResults(legacyData, newData) {
+  const legacyHexes = new Set(Object.keys(legacyData));
+  const newHexes = new Set(Object.keys(newData));
+  
+  const bothHexes = [...legacyHexes].filter(hex => newHexes.has(hex));
+  
+  let totalDelayDiff = 0;
+  let totalDopplerDiff = 0;
+  let delayCount = 0;
+  let dopplerCount = 0;
+  
+  const discrepancies = [];
+  
+  for (const hex of bothHexes) {
+    const legacy = legacyData[hex];
+    const newAc = newData[hex];
+    
+    const legacyDelay = parseFloat(legacy.delay);
+    const newDelay = parseFloat(newAc.delay);
+    const legacyDoppler = legacy.doppler ? parseFloat(legacy.doppler) : null;
+    const newDoppler = newAc.doppler || null;
+    
+    if (!isNaN(legacyDelay) && !isNaN(newDelay)) {
+      const delayDiff = Math.abs(newDelay - legacyDelay);
+      totalDelayDiff += delayDiff;
+      delayCount++;
+      
+      let dopplerDiff = null;
+      if (legacyDoppler !== null && newDoppler !== null && !isNaN(legacyDoppler) && !isNaN(newDoppler)) {
+        dopplerDiff = Math.abs(newDoppler - legacyDoppler);
+        totalDopplerDiff += dopplerDiff;
+        dopplerCount++;
       }
-
-      // Convert aircraft array to object keyed by hex
-      const adsbData = {};
-      for (const ac of aircraft) {
-        if (!ac.hex) continue;
-
-        // Calculate timestamp from tar1090 data (now - seen_pos)
-        const timestamp = Date.now() / 1000 - (ac.seen_pos || 0);
-
-        adsbData[ac.hex] = {
-          hex: ac.hex,
-          flight: ac.flight || '',
-          timestamp: timestamp,
-          lat: ac.lat,
-          lon: ac.lon,
-          alt_geom: ac.alt_geom,
-          alt_baro: ac.alt_baro,
-          gs: ac.gs,
-          track: ac.track,
-          geom_rate: ac.geom_rate
-        };
-      }
-
-      // Extrapolate ADSB positions to detection timestamp
-      const rxPos = {
-        lat: config.location.rx.latitude,
-        lon: config.location.rx.longitude,
-        alt: config.location.rx.altitude
-      };
-      const txPos = {
-        lat: config.location.tx.latitude,
-        lon: config.location.tx.longitude,
-        alt: config.location.tx.altitude
-      };
-
-      const synchronized = extrapolateAdsbData(
-        adsbData,
-        detectionTimestamp,
-        rxPos,
-        txPos,
-        config.capture.fc
-      );
-
-      res.json(synchronized);
-    } catch (error) {
-      console.error('Error in /api/adsb2dd:', error);
-      res.json({});
+      
+      discrepancies.push({
+        hex: hex,
+        flight: newAc.flight || legacy.flight || '',
+        delay_legacy: Math.round(legacyDelay * 100) / 100,
+        delay_new: Math.round(newDelay * 100) / 100,
+        delay_diff: Math.round(delayDiff * 100) / 100,
+        doppler_legacy: legacyDoppler !== null ? Math.round(legacyDoppler * 100) / 100 : null,
+        doppler_new: newDoppler !== null ? Math.round(newDoppler * 100) / 100 : null,
+        doppler_diff: dopplerDiff !== null ? Math.round(dopplerDiff * 100) / 100 : null
+      });
     }
   }
-  else {
-    res.status(400).end();
+  
+  discrepancies.sort((a, b) => b.delay_diff - a.delay_diff);
+  
+  return {
+    total_aircraft: {
+      legacy: legacyHexes.size,
+      new: newHexes.size,
+      both: bothHexes.length,
+      legacy_only: legacyHexes.size - bothHexes.length,
+      new_only: newHexes.size - bothHexes.length
+    },
+    avg_delay_diff: delayCount > 0 ? Math.round((totalDelayDiff / delayCount) * 100) / 100 : null,
+    avg_doppler_diff: dopplerCount > 0 ? Math.round((totalDopplerDiff / dopplerCount) * 100) / 100 : null,
+    largest_discrepancies: discrepancies.slice(0, 10)
+  };
+}
+
+async function fetchFromTar1090AndExtrapolate() {
+  const aircraft = await getCachedAircraft();
+
+  let detectionTimestamp = Date.now() / 1000;
+  try {
+    if (detection) {
+      const detectionData = JSON.parse(detection);
+      if (detectionData.timestamp) {
+        detectionTimestamp = detectionData.timestamp / 1000;
+      }
+    }
+  } catch (e) {
+    console.error('Error parsing detection timestamp:', e.message);
+  }
+
+  const adsbData = {};
+  for (const ac of aircraft) {
+    if (!ac.hex) continue;
+
+    const timestamp = Date.now() / 1000 - (ac.seen_pos || 0);
+
+    adsbData[ac.hex] = {
+      hex: ac.hex,
+      flight: ac.flight || '',
+      timestamp: timestamp,
+      lat: ac.lat,
+      lon: ac.lon,
+      alt_geom: ac.alt_geom,
+      alt_baro: ac.alt_baro,
+      gs: ac.gs,
+      track: ac.track,
+      geom_rate: ac.geom_rate
+    };
+  }
+
+  const rxPos = {
+    lat: config.location.rx.latitude,
+    lon: config.location.rx.longitude,
+    alt: config.location.rx.altitude
+  };
+  const txPos = {
+    lat: config.location.tx.latitude,
+    lon: config.location.tx.longitude,
+    alt: config.location.tx.altitude
+  };
+
+  const synchronized = extrapolateAdsbData(
+    adsbData,
+    detectionTimestamp,
+    rxPos,
+    txPos,
+    config.capture.fc
+  );
+
+  return synchronized;
+}
+
+app.get('/api/adsb2dd', async (req, res) => {
+  if (!config.truth.adsb.enabled) {
+    return res.status(400).end();
+  }
+
+  try {
+    let result = {};
+
+    if (config.truth.adsb.diagnostic_mode) {
+      const legacyResult = await fetchFromAdsbService();
+      const newResult = await fetchFromTar1090AndExtrapolate();
+      
+      const comparison = compareAdsbResults(legacyResult, newResult);
+      
+      result = {
+        method: 'diagnostic',
+        legacy: legacyResult,
+        new: newResult,
+        comparison: comparison
+      };
+    } else if (config.truth.adsb.use_legacy_method) {
+      result = await fetchFromAdsbService();
+    } else {
+      result = await fetchFromTar1090AndExtrapolate();
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error in /api/adsb2dd:', error);
+    res.json({});
   }
 });
