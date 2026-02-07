@@ -76,7 +76,7 @@ truth:
     tar1090: 'sfo1.retnode.com'
     adsb2dd: 'localhost:49155'
     use_legacy_method: false
-    diagnostic_mode: false
+    diagnostic_mode: true
     delay_tolerance: 2.0
     doppler_tolerance: 5.0
   ais:
