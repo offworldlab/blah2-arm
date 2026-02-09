@@ -510,19 +510,7 @@ app.get('/api/adsb2dd', async (req, res) => {
   try {
     let result = {};
 
-    if (config.truth.adsb.diagnostic_mode) {
-      const legacyResult = await fetchFromAdsbService();
-      const newResult = await fetchFromTar1090AndExtrapolate();
-      
-      const comparison = compareAdsbResults(legacyResult, newResult);
-      
-      result = {
-        method: 'diagnostic',
-        legacy: legacyResult,
-        new: newResult,
-        comparison: comparison
-      };
-    } else if (config.truth.adsb.use_legacy_method) {
+    if (config.truth.adsb.use_legacy_method) {
       result = await fetchFromAdsbService();
     } else {
       result = await fetchFromTar1090AndExtrapolate();
@@ -531,6 +519,31 @@ app.get('/api/adsb2dd', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error in /api/adsb2dd:', error);
+    res.json({});
+  }
+});
+
+app.get('/api/adsb2dd/diagnostic', async (req, res) => {
+  if (!config.truth.adsb.enabled) {
+    return res.status(400).end();
+  }
+
+  try {
+    const legacyResult = await fetchFromAdsbService();
+    const newResult = await fetchFromTar1090AndExtrapolate();
+
+    const comparison = compareAdsbResults(legacyResult, newResult);
+
+    const result = {
+      method: 'diagnostic',
+      legacy: legacyResult,
+      new: newResult,
+      comparison: comparison
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error in /api/adsb2dd/diagnostic:', error);
     res.json({});
   }
 });
