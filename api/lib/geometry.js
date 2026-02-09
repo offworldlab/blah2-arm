@@ -62,8 +62,8 @@ function calculateBistaticDoppler(aircraftPos, aircraftVel, rxPos, txPos, freque
   const vRadialTx = -(vx * Math.sin(bearingToTx) + vy * Math.cos(bearingToTx));
   
   const c = 299792458;
-  const doppler = (vRadialRx + vRadialTx) * frequency / c;
-  
+  const doppler = -(vRadialRx + vRadialTx) * frequency / c;
+
   return doppler;
 }
 
