@@ -114,7 +114,7 @@ function computeBistaticDoppler(aircraft, rx, tx, fc) {
   const range_rate_tx = -(vel_ecef.x * vec_to_tx.x + vel_ecef.y * vec_to_tx.y + vel_ecef.z * vec_to_tx.z);
   const bistatic_range_rate = range_rate_rx + range_rate_tx;
   const wavelength = SPEED_OF_LIGHT / fc;
-  const doppler = -bistatic_range_rate / wavelength;
+  const doppler = bistatic_range_rate / wavelength;
   return doppler;
 }
 
