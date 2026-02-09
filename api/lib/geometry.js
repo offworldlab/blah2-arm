@@ -22,10 +22,10 @@ function calculateBistaticDelay(aircraftPos, rxPos, txPos) {
   let dRxAircraft = haversineDistance(rxPos, aircraftPos);
   let dTxAircraft = haversineDistance(txPos, aircraftPos);
   let dRxTx = haversineDistance(rxPos, txPos);
-  
-  const altRx = rxPos.alt || 0;
-  const altTx = txPos.alt || 0;
-  const altAircraft = aircraftPos.alt || 0;
+
+  const altRx = rxPos.alt || 0;       // meters (from config)
+  const altTx = txPos.alt || 0;       // meters (from config)
+  const altAircraft = (aircraftPos.alt || 0) * 0.3048; // feet -> meters
   
   dRxAircraft = Math.sqrt(dRxAircraft**2 + (altAircraft - altRx)**2);
   dTxAircraft = Math.sqrt(dTxAircraft**2 + (altAircraft - altTx)**2);
