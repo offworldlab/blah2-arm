@@ -6,6 +6,8 @@ const dns = require('dns');
 const http = require('http');
 const bistatic = require('./bistatic.js');
 const { extrapolateAdsbData } = require('./lib/extrapolation');
+const { calculateBistaticDelay, calculateBistaticDoppler } = require('./lib/geometry');
+const { generateMockMapData, generateMockDetections } = require('./mock_radar.js');
 
 // parse config file
 var config;
@@ -78,6 +80,148 @@ var data_timing;
 var data_iqdata;
 var capture = false;
 
+// Mock radar data mode (for local testing without hardware)
+// Set environment variable MOCK_RADAR=true to enable
+// Defaults to false for production use
+const MOCK_MODE = process.env.MOCK_RADAR === 'true';
+let mockTimestamp = Date.now();
+
+// Fetch aircraft from synthetic-adsb
+async function fetchSyntheticAircraft() {
+  try {
+    const response = await new Promise((resolve, reject) => {
+      http.get('http://synthetic-adsb:5001/data/aircraft.json', { timeout: 2000 }, (resp) => {
+        let data = '';
+        resp.on('data', (chunk) => { data += chunk; });
+        resp.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }).on('error', reject);
+    });
+    return response.aircraft || [];
+  } catch (error) {
+    console.warn('Failed to fetch synthetic aircraft:', error.message);
+    return [];
+  }
+}
+
+// Calculate mock detections from synthetic aircraft using extrapolation
+async function calculateMockDetections() {
+  const aircraft = await fetchSyntheticAircraft();
+
+  if (aircraft.length === 0) {
+    return generateMockDetections();
+  }
+
+  const detectionTimestamp = Date.now() / 1000;
+
+  // Build ADSB data structure matching the format expected by extrapolateAdsbData
+  const adsbData = {};
+  for (const ac of aircraft) {
+    if (!ac.hex) continue;
+
+    const timestamp = Date.now() / 1000 - (ac.seen_pos || 0);
+
+    adsbData[ac.hex] = {
+      hex: ac.hex,
+      timestamp: timestamp,
+      lat: ac.lat,
+      lon: ac.lon,
+      alt_geom: ac.alt_geom,
+      alt_baro: ac.alt_baro,
+      gs: ac.gs,
+      track: ac.track,
+      geom_rate: ac.geom_rate
+    };
+  }
+
+  const rxPos = {
+    lat: config.location.rx.latitude,
+    lon: config.location.rx.longitude,
+    alt: config.location.rx.altitude
+  };
+
+  const txPos = {
+    lat: config.location.tx.latitude,
+    lon: config.location.tx.longitude,
+    alt: config.location.tx.altitude
+  };
+
+  // Use the SAME extrapolation function as the ADSB endpoint
+  const synchronized = extrapolateAdsbData(
+    adsbData,
+    detectionTimestamp,
+    rxPos,
+    txPos,
+    config.capture.fc
+  );
+
+  // Convert to detection format
+  const detections = {
+    timestamp: Date.now(),
+    delay: [],
+    doppler: [],
+    snr: [],
+    adsb: []
+  };
+
+  for (const hex in synchronized) {
+    const ac = synchronized[hex];
+    if (ac.delay !== null && ac.delay !== undefined && ac.doppler !== null && ac.doppler !== undefined) {
+      detections.delay.push(ac.delay);
+      detections.doppler.push(ac.doppler);
+      detections.snr.push(25 + Math.random() * 10);
+      detections.adsb.push(hex);
+    }
+  }
+
+  return detections;
+}
+
+if (MOCK_MODE) {
+  console.log('MOCK RADAR MODE ENABLED - Physics-based detections from synthetic-adsb');
+
+  // Generate initial mock data
+  calculateMockDetections().then(initialDetections => {
+    const detectionPositions = initialDetections.delay.map((d, i) => ({
+      delay: d,
+      doppler: initialDetections.doppler[i]
+    }));
+
+    const initialMap = generateMockMapData(detectionPositions);
+    map = JSON.stringify(initialMap);
+    detection = JSON.stringify(initialDetections);
+    console.log('Initial mock detections loaded:', initialDetections.delay.length, 'aircraft');
+  });
+
+  timestamp = mockTimestamp.toString();
+
+  // Update mock data every 2 seconds to trigger frontend polling
+  setInterval(async () => {
+    mockTimestamp = Date.now();
+    timestamp = mockTimestamp.toString();
+
+    // Calculate detections from synthetic aircraft
+    const mockDetections = await calculateMockDetections();
+    detection = JSON.stringify(mockDetections);
+
+    // Generate heatmap with hotspots at detection locations
+    const detectionPositions = mockDetections.delay.map((d, i) => ({
+      delay: d,
+      doppler: mockDetections.doppler[i]
+    }));
+    const newMap = generateMockMapData(detectionPositions);
+    map = JSON.stringify(newMap);
+
+    console.log('Mock radar data updated, timestamp:', timestamp, 'detections:', mockDetections.delay.length, 'aircraft');
+  }, 2000);
+}
+
+// Fetch detection data from synthetic radar API
 // api server
 const app = express();
 // header on all requests
@@ -510,19 +654,7 @@ app.get('/api/adsb2dd', async (req, res) => {
   try {
     let result = {};
 
-    if (config.truth.adsb.diagnostic_mode) {
-      const legacyResult = await fetchFromAdsbService();
-      const newResult = await fetchFromTar1090AndExtrapolate();
-      
-      const comparison = compareAdsbResults(legacyResult, newResult);
-      
-      result = {
-        method: 'diagnostic',
-        legacy: legacyResult,
-        new: newResult,
-        comparison: comparison
-      };
-    } else if (config.truth.adsb.use_legacy_method) {
+    if (config.truth.adsb.use_legacy_method) {
       result = await fetchFromAdsbService();
     } else {
       result = await fetchFromTar1090AndExtrapolate();
@@ -531,6 +663,31 @@ app.get('/api/adsb2dd', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error in /api/adsb2dd:', error);
+    res.json({});
+  }
+});
+
+app.get('/api/adsb2dd/diagnostic', async (req, res) => {
+  if (!config.truth.adsb.enabled) {
+    return res.status(400).end();
+  }
+
+  try {
+    const legacyResult = await fetchFromAdsbService();
+    const newResult = await fetchFromTar1090AndExtrapolate();
+
+    const comparison = compareAdsbResults(legacyResult, newResult);
+
+    const result = {
+      method: 'diagnostic',
+      legacy: legacyResult,
+      new: newResult,
+      comparison: comparison
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error in /api/adsb2dd/diagnostic:', error);
     res.json({});
   }
 });

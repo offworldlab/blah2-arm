@@ -176,6 +176,7 @@ var intervalId = window.setInterval(function () {
                   mode: 'markers',
                   type: 'scatter',
                   marker: {
+                    color: 'orange',
                     size: 16,
                     opacity: 0.6
                   }
@@ -186,6 +187,7 @@ var intervalId = window.setInterval(function () {
                 mode: 'markers',
                 type: 'scatter',
                 marker: {
+                  color: 'green',
                   size: 16,
                   opacity: 0.6
                 }
