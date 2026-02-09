@@ -16,7 +16,8 @@ function extrapolatePosition(aircraft, targetTimestamp) {
   
   const dx = velocityMs * Math.sin(trackRad) * dt;
   const dy = velocityMs * Math.cos(trackRad) * dt;
-  const dz = (aircraft.geom_rate || 0) * 0.00508 * dt;
+  // geom_rate is ft/min; convert to ft/s to keep altitude in feet
+  const dz = (aircraft.geom_rate || 0) / 60 * dt;
   
   const latRad = aircraft.lat * Math.PI / 180;
   const newLat = aircraft.lat + (dy / 111320);
