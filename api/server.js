@@ -445,19 +445,24 @@ function compareAdsbResults(legacyData, newData) {
   };
 }
 
-async function fetchFromTar1090AndExtrapolate() {
+async function fetchFromTar1090AndExtrapolate(clientDetectionTs) {
   const aircraft = await getCachedAircraft();
 
-  let detectionTimestamp = Date.now() / 1000;
-  try {
-    if (detection) {
-      const detectionData = JSON.parse(detection);
-      if (detectionData.timestamp) {
-        detectionTimestamp = detectionData.timestamp / 1000;
+  let detectionTimestamp;
+  if (clientDetectionTs) {
+    detectionTimestamp = clientDetectionTs;
+  } else {
+    detectionTimestamp = Date.now() / 1000;
+    try {
+      if (detection) {
+        const detectionData = JSON.parse(detection);
+        if (detectionData.timestamp) {
+          detectionTimestamp = detectionData.timestamp / 1000;
+        }
       }
+    } catch (e) {
+      console.error('Error parsing detection timestamp:', e.message);
     }
-  } catch (e) {
-    console.error('Error parsing detection timestamp:', e.message);
   }
 
   const adsbData = {};
@@ -510,10 +515,12 @@ app.get('/api/adsb2dd', async (req, res) => {
   try {
     let result = {};
 
+    const clientTs = req.query.detection_ts ? parseFloat(req.query.detection_ts) / 1000 : undefined;
+
     if (config.truth.adsb.use_legacy_method) {
       result = await fetchFromAdsbService();
     } else {
-      result = await fetchFromTar1090AndExtrapolate();
+      result = await fetchFromTar1090AndExtrapolate(clientTs);
     }
 
     res.json(result);
@@ -529,8 +536,9 @@ app.get('/api/adsb2dd/diagnostic', async (req, res) => {
   }
 
   try {
+    const clientTs = req.query.detection_ts ? parseFloat(req.query.detection_ts) / 1000 : undefined;
     const legacyResult = await fetchFromAdsbService();
-    const newResult = await fetchFromTar1090AndExtrapolate();
+    const newResult = await fetchFromTar1090AndExtrapolate(clientTs);
 
     const comparison = compareAdsbResults(legacyResult, newResult);
 

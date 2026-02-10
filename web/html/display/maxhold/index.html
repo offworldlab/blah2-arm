@@ -11,13 +11,61 @@
   <!-- load lib css -->
   <link rel="stylesheet" href="../../lib/bootstrap-5.2.3.min.css">
   <style>
+    #match-stats {
+      position: absolute;
+      top: 10px;
+      right: 60px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      z-index: 1000;
+      max-width: 420px;
+      max-height: 50vh;
+      overflow-y: auto;
+      display: none;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    #match-stats h4 {
+      margin: 0 0 6px 0;
+      font-size: 13px;
+      color: #ffd54f;
+      font-weight: bold;
+    }
+    #match-stats table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #match-stats th {
+      text-align: left;
+      font-size: 10px;
+      color: #aaa;
+      padding: 2px 6px 2px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    #match-stats td {
+      padding: 2px 6px 2px 0;
+      font-size: 11px;
+    }
+    #match-stats .summary-line {
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: #b0b0b0;
+    }
+    #match-stats .positive { color: #ef5350; }
+    #match-stats .negative { color: #42a5f5; }
+    #match-stats .match-green { color: #66bb6a; }
+    #match-stats .match-yellow { color: #ffd54f; }
   </style>
 </head>
 <body style="background-color:#f78c58;">
-  <div style="height: 100vh; width: 95vw" class="container-fluid">
+  <div style="height: 100vh; width: 95vw; position: relative;" class="container-fluid">
     <div style="height: 100vh; width: 95vw" class="row d-flex">
       <div class="justify-content-center" id="data"></div>
     </div>
+    <div id="match-stats"></div>
 </body>
 <script>
   var urlMap = '/stash/map';
