@@ -348,12 +348,6 @@ function getAdsbMarkerColors(adsbDataKeyed) {
   return colors;
 }
 
-function escapeText(str) {
-  var div = document.createElement('div');
-  div.textContent = str;
-  return div.textContent;
-}
-
 function updateStatsOverlay() {
   var el = document.getElementById('match-stats');
   if (!el) return;
@@ -422,7 +416,7 @@ function updateStatsOverlay() {
 
     var tdFlight = document.createElement('td');
     tdFlight.className = 'match-green';
-    tdFlight.textContent = escapeText(t.flight);
+    tdFlight.textContent = t.flight;
     tr.appendChild(tdFlight);
 
     var tdDelay = document.createElement('td');
