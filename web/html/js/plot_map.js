@@ -126,12 +126,9 @@ var intervalId = window.setInterval(function () {
             detection = data_detection;
           });
 
-        // get ADS-B data if enabled in config
-
-// Replace the interval ADS-B section (lines ~130-141) with:
-        // get ADS-B data if enabled in config
+        // get ADS-B data if enabled in config, pass detection timestamp for synchronization
         if (isTruth) {
-          $.getJSON(urlAdsbLink, function () { })
+          $.getJSON(urlAdsbLink + '?detection_ts=' + encodeURIComponent(timestamp), function () { })
             .done(function (data_adsb) {
               adsb['delay'] = [];
               adsb['doppler'] = [];
@@ -190,7 +187,7 @@ var intervalId = window.setInterval(function () {
                   opacity: 0.6
                 }
             };
-              
+
               var data_trace = [trace1, trace2, trace3];
               Plotly.newPlot('data', data_trace, layout, config);
             }
