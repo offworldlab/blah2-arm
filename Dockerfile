@@ -138,6 +138,10 @@ COPY --from=blah2_env /usr/local/lib/libfftw3.so* /usr/local/lib/
 COPY --from=blah2_env /usr/local/lib/libfftw3f.so* /usr/local/lib/
 COPY --from=blah2_env /usr/local/lib/libfftw3_threads.so* /usr/local/lib/
 COPY --from=blah2_env /usr/local/lib/libfftw3f_threads.so* /usr/local/lib/
+
+# Copy OpenBLAS libraries from vcpkg build stage
+COPY --from=blah2_env /opt/blah2/lib/vcpkg_installed/*/lib/libopenblas* /usr/local/lib/
+
 RUN ldconfig
 
 # Copy the compiled binary from build stage
