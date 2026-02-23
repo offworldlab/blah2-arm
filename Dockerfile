@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.source https://github.com/30hours/blah2
 WORKDIR /opt/blah2
 ADD lib lib
 
-# Install base dependencies
+# Install base dependencies (note: libfftw3-dev removed - building from source with NEON)
 RUN apt-get update && apt-get install -y \
     g++ \
     make \
@@ -18,7 +18,6 @@ RUN apt-get update && apt-get install -y \
     doxygen \
     graphviz \
     expect \
-    libfftw3-dev \
     pkg-config \
     gfortran \
     libhackrf-dev \
@@ -32,6 +31,27 @@ RUN apt-get update && apt-get install -y \
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
+
+# Build FFTW from source with ARM NEON optimizations (2-4x faster FFTs)
+# Building both double and single precision for flexibility
+RUN cd /tmp \
+    && curl -L http://www.fftw.org/fftw-3.3.10.tar.gz -o fftw-3.3.10.tar.gz \
+    && tar xzf fftw-3.3.10.tar.gz \
+    && cd fftw-3.3.10 \
+    # Build double-precision with NEON (what blah2 uses)
+    && ./configure --enable-shared --enable-threads --enable-neon --prefix=/usr/local \
+        CFLAGS="-O3 -march=native" \
+    && make -j$(nproc) \
+    && make install \
+    # Build single-precision with NEON (for safety/future use)
+    && make clean \
+    && ./configure --enable-shared --enable-threads --enable-neon --enable-single --prefix=/usr/local \
+        CFLAGS="-O3 -march=native" \
+    && make -j$(nproc) \
+    && make install \
+    && ldconfig \
+    && cd /tmp \
+    && rm -rf fftw-3.3.10*
 
 # install dependencies from vcpkg
 ENV VCPKG_ROOT=/opt/vcpkg
@@ -105,12 +125,19 @@ LABEL maintainer="Jehan <jehan.azad@gmail.com>"
 LABEL org.opencontainers.image.source https://github.com/30hours/blah2
 
 # Install only runtime dependencies (no dev packages, no compilers)
+# Note: libfftw3-double3 removed - using NEON-optimized build from source
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libfftw3-double3 \
     libgfortran5 \
     procps \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy NEON-optimized FFTW libraries from build stage
+COPY --from=blah2_env /usr/local/lib/libfftw3.so* /usr/local/lib/
+COPY --from=blah2_env /usr/local/lib/libfftw3f.so* /usr/local/lib/
+COPY --from=blah2_env /usr/local/lib/libfftw3_threads.so* /usr/local/lib/
+COPY --from=blah2_env /usr/local/lib/libfftw3f_threads.so* /usr/local/lib/
+RUN ldconfig
 
 # Copy the compiled binary from build stage
 COPY --from=blah2 /blah2/bin/blah2 /opt/blah2/bin/blah2
