@@ -34,24 +34,20 @@ RUN apt-get update && apt-get install -y \
 
 # Build FFTW from source with ARM NEON optimizations (2-4x faster FFTs)
 # Building both double and single precision for flexibility
-# NOTE: CPU target is set to Cortex-A76 (Raspberry Pi 5)
-#       For other targets, change -mcpu flag:
-#       - Pi 4: -mcpu=cortex-a72
-#       - Pi 3: -mcpu=cortex-a53
-#       - Generic ARMv8: -march=armv8-a+simd
+# Uses generic ARMv8+SIMD target for portability across all 64-bit Pi models (3/4/5)
 RUN cd /tmp \
     && curl -L http://www.fftw.org/fftw-3.3.10.tar.gz -o fftw-3.3.10.tar.gz \
     && tar xzf fftw-3.3.10.tar.gz \
     && cd fftw-3.3.10 \
     # Build double-precision with NEON (what blah2 uses)
     && ./configure --enable-shared --enable-threads --enable-neon --prefix=/usr/local \
-        CFLAGS="-O3 -mcpu=cortex-a76" \
+        CFLAGS="-O3 -march=armv8-a+simd" \
     && make -j$(nproc) \
     && make install \
     # Build single-precision with NEON (for safety/future use)
     && make clean \
     && ./configure --enable-shared --enable-threads --enable-neon --enable-single --prefix=/usr/local \
-        CFLAGS="-O3 -mcpu=cortex-a76" \
+        CFLAGS="-O3 -march=armv8-a+simd" \
     && make -j$(nproc) \
     && make install \
     && ldconfig \
