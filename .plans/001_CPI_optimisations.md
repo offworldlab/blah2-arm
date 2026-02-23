@@ -49,13 +49,15 @@ These optimizations make the same computations faster without changing DSP outpu
   - `--enable-neon` - ARM SIMD instructions
   - `--enable-threads` - Multi-threading support
   - `--enable-shared` - Shared libraries
-  - `-O3 -march=native` - Compiler optimizations
+  - `CFLAGS="-O3 -march=armv8-a+simd"` - Portable ARMv8+NEON optimizations
 - Build both single and double precision
 - Update runtime stage to copy NEON-enabled libraries
 
 **Expected gain**: 2-4x faster FFT operations
 
 **Risk**: None - same FFT algorithm, just faster execution
+
+**Lessons learned**: Initial implementation used `-march=native` which caused SIGILL (exit 132) crashes on Pi 5. GHA runner's "native" CPU differs from Pi 5, causing illegal instruction errors. Fixed by using `-march=armv8-a+simd` for portability while maintaining NEON performance.
 
 **Files modified**:
 - `Dockerfile` (lines 8-34, 108-113)
@@ -67,13 +69,15 @@ These optimizations make the same computations faster without changing DSP outpu
 **Changes**:
 - CMakeLists.txt line 10: Add optimization flags:
   ```cmake
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -O3 -march=native -mtune=native")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -O3 -march=armv8-a+simd")
   ```
 
 **Flags explanation**:
 - `-O3`: Maximum optimization level
-- `-march=native`: Use all instructions available on target CPU (ARMv8 + NEON)
-- `-mtune=native`: Tune for target CPU (Cortex-A76 on Pi 5)
+- `-march=armv8-a+simd`: ARMv8-A architecture + NEON SIMD instructions
+  - **Note**: Using `armv8-a+simd` instead of `native` to avoid SIGILL (exit 132) crashes
+  - GHA builds compile for runner's CPU, not target Pi 5 → illegal instruction errors
+  - `armv8-a+simd` is portable across all Pi 3/4/5 while still enabling NEON
 
 **Expected gain**: 10-20% overall speedup (better code generation, auto-vectorization)
 

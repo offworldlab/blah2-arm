@@ -7,7 +7,7 @@ project(blah2)
 include(CMakePrintHelpers)
 include(CTest)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -O3 -march=armv8-a+simd")
 
 find_package(Threads REQUIRED)
 find_path(RAPIDJSON_INCLUDE_DIRS "rapidjson/allocators.h")
