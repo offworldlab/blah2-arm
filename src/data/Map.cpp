@@ -1,5 +1,6 @@
 #include "Map.h"
 #include "data/meta/Constants.h"
+#include "data/meta/JsonSaveHelper.h"
 #include <iostream>
 #include <cstdlib>
 #include <chrono>
@@ -208,57 +209,7 @@ void Map<T>::set_metrics()
 template <class T>
 bool Map<T>::save(std::string _json, std::string filename)
 {
-  using namespace rapidjson;
-
-  rapidjson::Document document;
-
-  // create file if it doesn't exist
-  if (FILE *fp = fopen(filename.c_str(), "r"); !fp)
-  {
-    if (fp = fopen(filename.c_str(), "w"); !fp)
-      return false;
-    fputs("[]", fp);
-    fclose(fp);
-  }
-
-  // add the document to the file
-  if (FILE *fp = fopen(filename.c_str(), "rb+"); fp)
-  {
-    // check if first is [
-    std::fseek(fp, 0, SEEK_SET);
-    if (getc(fp) != '[')
-    {
-      std::fclose(fp);
-      return false;
-    }
-
-    // is array empty?
-    bool isEmpty = false;
-    if (getc(fp) == ']')
-      isEmpty = true;
-
-    // check if last is ]
-    std::fseek(fp, -1, SEEK_END);
-    if (getc(fp) != ']')
-    {
-      std::fclose(fp);
-      return false;
-    }
-
-    // replace ] by ,
-    fseek(fp, -1, SEEK_END);
-    if (!isEmpty)
-      fputc(',', fp);
-
-    // add json element
-    fwrite(_json.c_str(), sizeof(char), _json.length(), fp);
-
-    // close the array
-    std::fputc(']', fp);
-    fclose(fp);
-    return true;
-  }
-  return false;
+  return JsonSaveHelper::append_to_array_file(_json, filename);
 }
 
 // allowed types

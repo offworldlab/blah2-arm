@@ -4,13 +4,14 @@
 /// @details Implements a <a href="https://en.wikipedia.org/wiki/Wiener_filter#Finite_impulse_response_Wiener_filter_for_discrete_series">Wiener-Hopf filter</a>.
 /// Uses <a href="https://en.wikipedia.org/wiki/Cholesky_decomposition">Cholesky decomposition</a> to speed up matrix inversion, as the Toeplitz matrix is positive-definite and Hermitian.
 /// @author 30hours
-/// @todo Fix the segmentation fault from clutter filter numerical instability.
 
 #ifndef WIENERHOPF_H
 #define WIENERHOPF_H
 
 #include "data/IqData.h"
 #include <stdint.h>
+#include <vector>
+#include <complex>
 #include <fftw3.h>
 #include <armadillo>
 
@@ -39,7 +40,8 @@ private:
 
   /// @brief FFTW storage for clutter filter processing.
   /// @{
-  std::complex<double> *dataX, *dataY, *dataOutX, *dataOutY, *dataA, *dataB, *filtX, *filtW, *filt;
+  std::vector<std::complex<double>> dataX, dataY, dataOutX, dataOutY, dataA, dataB;
+  std::vector<std::complex<double>> filtX, filtW, filt;
   /// @}
 
   /// @brief Deque storage for clutter filter processing.

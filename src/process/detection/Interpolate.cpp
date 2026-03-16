@@ -5,12 +5,9 @@
 #include <stdint.h>
 #include <algorithm>
 
-// constructor
 Interpolate::Interpolate(bool _doDelay, bool _doDoppler)
+  : doDelay(_doDelay), doDoppler(_doDoppler), detection(nullptr)
 {
-  // input
-  doDelay = _doDelay;
-  doDoppler = _doDoppler;
 }
 
 Interpolate::~Interpolate()

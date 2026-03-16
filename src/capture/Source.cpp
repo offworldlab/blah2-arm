@@ -8,18 +8,15 @@
 #include <iomanip>
 
 Source::Source()
+  : type(), fc(0), fs(0), path(), saveIq(nullptr)
 {
 }
 
-// constructor
-Source::Source(std::string _type, uint32_t _fc, uint32_t _fs, 
+Source::Source(std::string _type, uint32_t _fc, uint32_t _fs,
     std::string _path, bool *_saveIq)
+  : type(std::move(_type)), fc(_fc), fs(_fs),
+    path(std::move(_path)), saveIq(_saveIq)
 {
-  type = _type;
-  fc = _fc;
-  fs = _fs;
-  path = _path;
-  saveIq = _saveIq;
 }
 
 std::string Source::open_file()
@@ -34,7 +31,7 @@ std::string Source::open_file()
 
   // create file path
   std::string typeLower = type;
-  std::transform(typeLower.begin(), typeLower.end(), 
+  std::transform(typeLower.begin(), typeLower.end(),
     typeLower.begin(), ::tolower);
   std::string file = path + timestamp + "." + typeLower + ".iq";
 
@@ -52,24 +49,14 @@ std::string Source::open_file()
 
 void Source::close_file()
 {
-  if (!saveIqFile.is_open())
+  if (saveIqFile.is_open())
   {
     saveIqFile.close();
   }
-
-  // switch member with blank file stream
-  std::ofstream blankFile;
-  std::swap(saveIqFile, blankFile);
 }
 
 void Source::kill()
 {
-  if (type == "RspDuo")
-  {
-    stop();
-  } else if (type == "HackRF")
-  {
-    stop();
-  }
+  stop();
   exit(0);
 }

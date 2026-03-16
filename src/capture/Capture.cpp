@@ -4,18 +4,12 @@
 #include <thread>
 #include <httplib.h>
 
-// constants
 const std::string Capture::VALID_TYPE[1] = {"RspDuo"};
 
-// constructor
 Capture::Capture(std::string _type, uint32_t _fs, uint32_t _fc, std::string _path)
+  : type(std::move(_type)), saveIq(false), replay(false), loop(false),
+    fs(_fs), fc(_fc), path(std::move(_path))
 {
-  type = _type;
-  fs = _fs;
-  fc = _fc;
-  path = _path;
-  replay = false;
-  saveIq = false;
 }
 
 void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
@@ -29,7 +23,7 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
   std::thread t1([&]{
     while (true)
     {
-      httplib::Client cli("http://" + ip_capture + ":" 
+      httplib::Client cli("http://" + ip_capture + ":"
         + std::to_string(port_capture));
       httplib::Result res = cli.Get("/capture");
 
@@ -64,7 +58,6 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
 
 std::unique_ptr<Source> Capture::factory_source(const std::string& type, c4::yml::NodeRef config, bool verbose)
 {
-    // SDRplay RSPduo
     if (type == VALID_TYPE[0])
     {
         int agcSetPoint, bandwidthNumber, gainReduction, lnaState;
@@ -80,7 +73,6 @@ std::unique_ptr<Source> Capture::factory_source(const std::string& type, c4::yml
           dabNotch, rfNotch, verbose);
     }
 
-    // handle unknown type
     std::cerr << "Error: Source type does not exist." << std::endl;
     return nullptr;
 }
@@ -89,5 +81,5 @@ void Capture::set_replay(bool _loop, std::string _file)
 {
   replay = true;
   loop = _loop;
-  file = _file;
+  file = std::move(_file);
 }

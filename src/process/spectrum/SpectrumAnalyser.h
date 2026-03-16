@@ -3,14 +3,14 @@
 /// @brief A class to generate frequency spectrum plots.
 /// @details Simple decimate and FFT on CPI IQ data for frequency spectrum.
 /// @author 30hours
-/// @todo Potentially create k spectrum plots from sub-CPIs.
-/// @todo FFT with HammingNumber class.
 
 #ifndef SPECTRUMANALYSER_H
 #define SPECTRUMANALYSER_H
 
 #include "data/IqData.h"
 #include <stdint.h>
+#include <vector>
+#include <complex>
 #include <fftw3.h>
 
 class SpectrumAnalyser
@@ -25,11 +25,11 @@ private:
   /// @brief Decimation factor.
   uint32_t decimation;
 
-  /// @brief FFTW plans for ambiguity processing.
+  /// @brief FFTW plan for spectrum processing.
   fftw_plan fftX;
 
-  /// @brief FFTW storage for ambiguity processing.
-  std::complex<double> *dataX;
+  /// @brief FFTW storage for spectrum processing.
+  std::vector<std::complex<double>> dataX;
 
   /// @brief Number of samples to perform FFT.
   uint32_t nfft;

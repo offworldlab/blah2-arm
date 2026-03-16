@@ -7,11 +7,9 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/filewritestream.h"
 
-// constructor
 IqData::IqData(uint32_t _n)
+  : n(_n), min(0), max(0), mean(0)
 {
-  n = _n;
-  data = new std::deque<std::complex<double>>;
 }
 
 uint32_t IqData::get_n()
@@ -21,7 +19,7 @@ uint32_t IqData::get_n()
 
 uint32_t IqData::get_length()
 {
-  return data->size();
+  return data.size();
 }
 
 void IqData::lock()
@@ -34,60 +32,44 @@ void IqData::unlock()
   mutex_lock.unlock();
 }
 
-std::deque<std::complex<double>> IqData::get_data()
+const std::deque<std::complex<double>>& IqData::get_data() const
 {
-  return *data;
+  return data;
 }
 
 void IqData::push_back(std::complex<double> sample)
 {
-  if (data->size() < n)
+  if (data.size() >= n)
   {
-    data->push_back(sample);
+    data.pop_front();
   }
-  else
-  {
-    data->pop_front();
-    data->push_back(sample);
-  }
+  data.push_back(sample);
 }
 
 std::complex<double> IqData::pop_front()
 {
-  if (data->empty()) {
+  if (data.empty())
+  {
     throw std::runtime_error("Attempting to pop from an empty deque");
   }
-  std::complex<double> sample = data->front();
-  data->pop_front();
+  std::complex<double> sample = data.front();
+  data.pop_front();
   return sample;
-}
-void IqData::print()
-{
-  int n = data->size();
-  std::cout << data->size() << std::endl;
-  for (int i = 0; i < n; i++)
-  {
-    std::cout << data->front() << std::endl;
-    data->pop_front();
-  }
 }
 
 void IqData::clear()
 {
-  while (!data->empty())
-  {
-    data->pop_front();
-  }
+  data.clear();
 }
 
 void IqData::update_spectrum(std::vector<std::complex<double>> _spectrum)
 {
-  spectrum = _spectrum;
+  spectrum = std::move(_spectrum);
 }
 
 void IqData::update_frequency(std::vector<double> _frequency)
 {
-  frequency = _frequency;
+  frequency = std::move(_frequency);
 }
 
 std::string IqData::to_json(uint64_t timestamp)

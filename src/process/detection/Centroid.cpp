@@ -3,13 +3,10 @@
 #include <vector>
 #include <cmath>
 
-// constructor
 Centroid::Centroid(uint16_t _nDelay, uint16_t _nDoppler, double _resolutionDoppler)
+  : nDelay(_nDelay), nDoppler(_nDoppler), resolutionDoppler(_resolutionDoppler),
+    detection(nullptr)
 {
-  // input
-  nDelay = _nDelay;
-  nDoppler = _nDoppler;
-  resolutionDoppler = _resolutionDoppler;
 }
 
 Centroid::~Centroid()

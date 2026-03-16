@@ -1,27 +1,18 @@
 #include "Tracker.h"
 #include <iostream>
 
-// constructor
-Tracker::Tracker(uint32_t _m, uint32_t _n, uint32_t _nDelete, 
+Tracker::Tracker(uint32_t _m, uint32_t _n, uint32_t _nDelete,
   double _cpi, double _maxAccInit, double _rangeRes, double _lambda)
+  : m(_m), n(_n), nDelete(_nDelete), cpi(_cpi),
+    maxAccInit(_maxAccInit), rangeRes(_rangeRes), lambda(_lambda),
+    timestamp(0)
 {
-  m = _m;
-  n = _n;
-  nDelete = _nDelete;
-  cpi = _cpi;
-  maxAccInit = _maxAccInit;
-  timestamp = 0;
-  rangeRes = _rangeRes;
-  lambda = _lambda;
-
-  double resolutionAcc = 1/(cpi*cpi);
-  uint16_t nAcc = (int)maxAccInit/resolutionAcc;
-  for (int i = 0; i < 2*nAcc+1; i++)
+  double resolutionAcc = 1 / (cpi * cpi);
+  uint16_t nAcc = static_cast<uint16_t>(maxAccInit / resolutionAcc);
+  for (int i = 0; i < 2 * nAcc + 1; i++)
   {
-    accInit.push_back(resolutionAcc*(i-nAcc));
+    accInit.push_back(resolutionAcc * (i - nAcc));
   }
-
-  Track track{};
 }
 
 Tracker::~Tracker()

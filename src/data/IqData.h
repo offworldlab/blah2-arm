@@ -19,11 +19,11 @@ private:
   /// @brief Maximum number of samples.
   uint32_t n;
 
-  /// @brief True if should not push to buffer (mutex).
+  /// @brief Mutex for thread-safe buffer access.
   std::mutex mutex_lock;
 
-  /// @brief Pointer to IQ data.
-  std::deque<std::complex<double>> *data;
+  /// @brief IQ data storage.
+  std::deque<std::complex<double>> data;
 
   /// @brief Minimum value.
   double min;
@@ -44,7 +44,7 @@ public:
   /// @brief Constructor.
   /// @param n Number of samples.
   /// @return The object.
-  IqData(uint32_t n);
+  explicit IqData(uint32_t n);
 
   /// @brief Getter for maximum number of samples.
   /// @return Maximum number of samples.
@@ -62,9 +62,9 @@ public:
   /// @return Void.
   void unlock();
 
-  /// @brief Getter for data.
+  /// @brief Getter for data (const reference to avoid copies).
   /// @return IQ data.
-  std::deque<std::complex<double>> get_data();
+  const std::deque<std::complex<double>>& get_data() const;
 
   /// @brief Push a sample to the queue.
   /// @param sample A single sample.
@@ -75,20 +75,16 @@ public:
   /// @return Sample from the front of the queue.
   std::complex<double> pop_front();
 
-  /// @brief Print to stdout (debug).
-  /// @return Void.
-  void print();
-
   /// @brief Clear samples from the queue.
   /// @return Void.
   void clear();
 
-  /// @brief Update the time differences and names.
+  /// @brief Update the spectrum data.
   /// @param spectrum Spectrum vector.
   /// @return Void.
   void update_spectrum(std::vector<std::complex<double>> spectrum);
 
-  /// @brief Update the time differences and names.
+  /// @brief Update the frequency data.
   /// @param frequency Frequency vector.
   /// @return Void.
   void update_frequency(std::vector<double> frequency);

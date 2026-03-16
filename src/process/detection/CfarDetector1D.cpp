@@ -5,15 +5,10 @@
 #include <vector>
 #include <cmath>
 
-// constructor
 CfarDetector1D::CfarDetector1D(double _pfa, int8_t _nGuard, int8_t _nTrain, int8_t _minDelay, double _minDoppler)
+  : pfa(_pfa), nGuard(_nGuard), nTrain(_nTrain),
+    minDelay(_minDelay), minDoppler(_minDoppler), detection(nullptr)
 {
-  // input
-  pfa = _pfa;
-  nGuard = _nGuard;
-  nTrain = _nTrain;
-  minDelay = _minDelay;
-  minDoppler = _minDoppler;
 }
 
 CfarDetector1D::~CfarDetector1D()
