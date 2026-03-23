@@ -110,7 +110,9 @@ app.get('/api/iqdata', (req, res) => {
   res.send(iqdata);
 });
 app.get('/api/config', (req, res) => {
-  res.send(config);
+  res.json({
+    truth: { adsb: { enabled: config.truth.adsb.enabled } }
+  });
 });
 
 // stash API
