@@ -32,15 +32,19 @@ var layout = {
   },
   width: document.getElementById('data').offsetWidth,
   height: document.getElementById('data').offsetHeight,
-  plot_bgcolor: "rgba(0,0,0,0)",
-  paper_bgcolor: "rgba(0,0,0,0)",
+  plot_bgcolor: "#ffffff",
+  paper_bgcolor: "#ffffff",
+  font: {
+    family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    color: "#1a1a18"
+  },
   annotations: [],
   displayModeBar: false,
   xaxis: {
     title: {
       text: xTitle,
       font: {
-        size: 24
+        size: 16
       }
     },
     showgrid: false,
@@ -51,7 +55,7 @@ var layout = {
     title: {
       text: yTitle,
       font: {
-        size: 24
+        size: 16
       }
     },
     showgrid: false,
@@ -62,9 +66,9 @@ var layout = {
   },
   legend: {
     orientation: "h",
-    bgcolor: "#f78c58",
-    bordercolor: "#000000",
-    borderwidth: 2
+    bgcolor: "#ffffff",
+    bordercolor: "#e8e8e3",
+    borderwidth: 1
   }
 };
 var config = {

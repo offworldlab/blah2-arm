@@ -4,63 +4,83 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta charset="UTF-8">
   <title>blah2</title>
-  <!-- load lib js -->
   <script src="../lib/bootstrap-5.2.3.min.js"></script>
   <script src="../lib/plotly-2.20.0.min.js"></script>
   <script src="../lib/jquery-3.6.4.min.js"></script>
-  <!-- load lib css -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../lib/bootstrap-5.2.3.min.css">
   <link rel="stylesheet" href="../lib/blah2.css">
-  <style>
-  </style>
 </head>
-<body style="background-color:#f78c58;">
-  <div class="container-fluid">
-    <div class="row align-items-center d-flex">
-    <nav class="navbar navbar-light navbar-expand text-center pb-5">
-      <!-- Links -->
-      <ul class="navbar-nav mx-auto justify-content-center">
-        <li class="nav-item px-3 px-md-4">
-          <a class="navbar-brand mx-0 menu" href="/">RADAR</a>
+<body>
+  <nav class="navbar navbar-light navbar-expand">
+    <div class="container-fluid">
+      <a class="site-brand" href="/">RETINA</a>
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="navbar-brand" href="/">Radar</a>
         </li>
-        <li class="nav-item px-3 px-md-4">
-          <a class="navbar-brand mx-0 menu text-decoration-underline" href="/controller/">CONTROLLER</a>
+        <li class="nav-item">
+          <a class="navbar-brand active" href="/controller/">Controller</a>
         </li>
       </ul>
-    </nav>
-    <div class="col-sm-12 col-md-12">
-      <ul class="list-unstyled text-center label">
-        <li class="py-1 title">Display</li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/display/map">Delay-Doppler map</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/display/maxhold">Max-hold delay Doppler map</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/display/detection/delay">Detections in delay over time</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/display/detection/doppler">Detections in Doppler over time</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/display/detection/delay-doppler">Detections in delay-Doppler over time</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/display/spectrum">Spectrum reference</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/display/timing">Timing display</a></li>
-      </ul>
     </div>
-    <div class="col-sm-12 col-md-12">
-      <ul class="list-unstyled text-center label">
-        <li class="py-1 title">API</li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/api/map">Map data</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/api/detection">Detection data</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/api/tracker">Tracker data</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/api/timing">Timing data</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/api/iqdata">IQ metadata</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/api/timestamp">Latest timestamp</a></li>
-      </ul>
+  </nav>
+  <div class="controller-page">
+    <div class="section-heading">Displays</div>
+    <div class="link-grid">
+      <a class="link-card" href="/display/map">
+        <span class="link-title">Delay-Doppler Map</span>
+        <span class="link-desc">Live heatmap of radar returns</span>
+      </a>
+      <a class="link-card" href="/display/maxhold">
+        <span class="link-title">Max-hold Map</span>
+        <span class="link-desc">Accumulated peak returns</span>
+      </a>
+      <a class="link-card" href="/display/detection/delay">
+        <span class="link-title">Detections in Delay</span>
+        <span class="link-desc">Range over time</span>
+      </a>
+      <a class="link-card" href="/display/detection/doppler">
+        <span class="link-title">Detections in Doppler</span>
+        <span class="link-desc">Velocity over time</span>
+      </a>
+      <a class="link-card" href="/display/detection/delay-doppler">
+        <span class="link-title">Detections in Delay-Doppler</span>
+        <span class="link-desc">Range vs velocity scatter</span>
+      </a>
+      <a class="link-card" href="/display/spectrum">
+        <span class="link-title">Spectrum</span>
+        <span class="link-desc">Reference channel waterfall</span>
+      </a>
+      <a class="link-card" href="/display/timing">
+        <span class="link-title">Timing</span>
+        <span class="link-desc">Processing time per stage</span>
+      </a>
     </div>
-    <div class="col-sm-12 col-md-12">
-      <ul class="list-unstyled text-center label">
-        <li class="py-1 title">Stash</li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/stash/map">Map data</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/stash/detection">Detection data</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/stash/iqdata">IqData metadata</a></li>
-        <li class="py-1"><a class="text-reset text-decoration-none" href="/stash/timing">Timing data</a></li>
-      </ul>
-    </div>
-  </div>
+
+    <details class="dev-section">
+      <summary>API</summary>
+      <div class="dev-links">
+        <a href="/api/map">map</a>
+        <a href="/api/detection">detection</a>
+        <a href="/api/tracker">tracker</a>
+        <a href="/api/timing">timing</a>
+        <a href="/api/iqdata">iqdata</a>
+        <a href="/api/timestamp">timestamp</a>
+      </div>
+    </details>
+
+    <details class="dev-section">
+      <summary>Stash</summary>
+      <div class="dev-links">
+        <a href="/stash/map">map</a>
+        <a href="/stash/detection">detection</a>
+        <a href="/stash/iqdata">iqdata</a>
+        <a href="/stash/timing">timing</a>
+      </div>
+    </details>
   </div>
 </body>
 <script src="../js/common.js"></script>
@@ -72,9 +92,7 @@
   if (isLocalHost) {
     for (var i = 0; i < anchors.length; i++) {
       if (anchors[i].href.includes('/api/') || anchors[i].href.includes('/stash/')) {
-        console.log(anchors[i].href);
         anchors[i].href = anchors[i].href.split(":49152")[0] + ":3000" + anchors[i].href.split(":49152")[1];
-        console.log(anchors[i].href);
       }
     }
   }

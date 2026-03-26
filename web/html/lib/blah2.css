@@ -1,37 +1,193 @@
-.menu {
-  font-family: 'Helvetica', sans-serif !important;
-  font-size: 1.5rem;
-  font-weight: bold;
+/* ── Design tokens ─────────────────────────────── */
+/* Retina-style warm neutrals + blue accent */
+:root {
+    --font-body:  -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono:  'SF Mono', 'Menlo', 'Consolas', monospace;
+
+    --color-text:           #1a1a18;
+    --color-muted:          #6b6b63;
+    --color-light:          #9c9c93;
+    --color-border:         #e8e8e3;
+    --color-bg:             #ffffff;
+    --color-bg-warm:        #f5f4f0;
+    --color-card:           #ffffff;
+
+    --color-primary:        #2563eb;
+    --color-primary-light:  #3b82f6;
+
+    --radius:     12px;
+    --radius-sm:  8px;
 }
-.title {
-  font-family: 'Helvetica', sans-serif !important;
-  font-size: 1.5rem;
-  font-weight: bold;
-  text-decoration: underline;
+
+/* ── Base ──────────────────────────────────────── */
+body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0;
 }
-.label {
-  font-family: 'Helvetica', sans-serif !important;
-  font-size: 1rem;
+
+/* ── Navbar ────────────────────────────────────── */
+.navbar {
+    background: var(--color-card);
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--color-border);
 }
-@media (min-width: 768px) {
-  .menu {
-    font-family: 'Helvetica', sans-serif !important;
-    font-size: 2rem;
-  }
-  .title {
-    font-family: 'Helvetica', sans-serif !important;
-    font-size: 2.5rem;
-    font-weight: bold;
-    text-decoration: underline;
-  }
-  .label {
-    font-family: 'Helvetica', sans-serif !important;
-    font-size: 1.5rem;
-  }
+.navbar .container-fluid {
+    padding: 0 1.5rem;
+}
+.site-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: var(--color-text);
+    font-family: 'JetBrains Mono', var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+}
+.site-brand img {
+    border-radius: 6px;
+    position: relative;
+    top: -2px;
+}
+.site-brand:hover {
+    color: var(--color-text);
+    text-decoration: none;
 }
 .navbar-nav {
-  flex-wrap: wrap;
+    flex-wrap: wrap;
+    gap: 0.5rem;
 }
+.nav-link, .navbar-brand {
+    font-family: var(--font-body) !important;
+    font-size: 0.85rem !important;
+    font-weight: 500;
+    color: var(--color-light) !important;
+    text-decoration: none !important;
+    padding: 0.35rem 0.9rem !important;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    letter-spacing: 0.02em;
+    transition: color 0.15s, border-color 0.15s;
+}
+.nav-link:hover, .navbar-brand:hover {
+    color: var(--color-text) !important;
+    border-color: var(--color-border);
+}
+.nav-link.active, .navbar-brand.active {
+    color: var(--color-text) !important;
+    font-weight: 500;
+    border-color: var(--color-border);
+}
+
+/* ── Controller page ──────────────────────────── */
+.controller-page {
+    max-width: 640px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
+.section-heading {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--color-light);
+    margin-bottom: 0.75rem;
+}
+
+/* Display link cards */
+.link-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+}
+@media (max-width: 500px) {
+    .link-grid { grid-template-columns: 1fr; }
+}
+.link-card {
+    display: flex;
+    flex-direction: column;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+.link-card:hover {
+    border-color: var(--color-light);
+    background: var(--color-bg-warm);
+}
+.link-title {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--color-text);
+}
+.link-desc {
+    font-size: 0.75rem;
+    color: var(--color-light);
+    margin-top: 0.15rem;
+}
+
+/* Collapsible dev sections */
+.dev-section {
+    margin-bottom: 0.5rem;
+}
+.dev-section summary {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--color-light);
+    cursor: pointer;
+    padding: 0.5rem 0;
+    list-style: none;
+}
+.dev-section summary::-webkit-details-marker { display: none; }
+.dev-section summary::before {
+    content: "›";
+    display: inline-block;
+    margin-right: 0.4rem;
+    transition: transform 0.15s;
+}
+.dev-section[open] summary::before {
+    transform: rotate(90deg);
+}
+.dev-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.5rem 0 0.75rem;
+}
+.dev-links a {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--color-muted);
+    text-decoration: none;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    transition: color 0.15s, border-color 0.15s;
+}
+.dev-links a:hover {
+    color: var(--color-text);
+    border-color: var(--color-light);
+}
+
+/* ── Plot container ───────────────────────────── */
+.plot-wrapper {
+    width: 100%;
+    height: calc(100vh - 56px);
+    padding: 0.5rem;
+}
+.plot-wrapper #data {
+    width: 100%;
+    height: 100%;
+}
+
+/* ── Plotly overrides ─────────────────────────── */
 div.plotly-notifier {
-  visibility: hidden;
+    visibility: hidden;
 }
