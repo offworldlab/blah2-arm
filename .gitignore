@@ -23,3 +23,6 @@ api/QUICK_TEST.md
 api/test_ab.sh
 api/DIAGNOSTIC_QUICK_START.sh
 api/PRE_DEPLOY_TEST.sh
+
+# Claude Code planning files
+.plans/

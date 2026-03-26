@@ -32,15 +32,19 @@ var layout = {
   hoverlabel: {
     namelength: 0
   },
-  plot_bgcolor: "rgba(0,0,0,0)",
-  paper_bgcolor: "rgba(0,0,0,0)",
+  plot_bgcolor: "#ffffff",
+  paper_bgcolor: "#ffffff",
+  font: {
+    family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    color: "#1a1a18"
+  },
   annotations: [],
   displayModeBar: false,
   xaxis: {
     title: {
       text: 'Frequency (MHz)',
       font: {
-        size: 24
+        size: 16
       }
     },
     ticks: '',
@@ -50,7 +54,7 @@ var layout = {
     title: {
       text: 'Timestamp',
       font: {
-        size: 24
+        size: 16
       }
     },
     ticks: '',
