@@ -24,6 +24,9 @@ var stash_timing = require('./stash/timing.js');
 // TCP client for forwarding detections to external tracker
 let trackerSocket = null;
 let trackerConnected = false;
+const sendBuffer = [];
+let lastSendTime = 0;
+let heartbeatInterval = null;
 
 function connectToTracker() {
   if (!config.network.tracker_forward?.enabled) return;
@@ -32,10 +35,15 @@ function connectToTracker() {
   const port = config.network.tracker_forward.port;
 
   trackerSocket = new net.Socket();
+  trackerSocket.setNoDelay(true);
 
   trackerSocket.connect(port, host, () => {
     console.log(`Connected to tracker at ${host}:${port}`);
+    while (sendBuffer.length > 0) {
+      trackerSocket.write(sendBuffer.shift());
+    }
     trackerConnected = true;
+    lastSendTime = Date.now();
   });
 
   trackerSocket.on('error', (err) => {
@@ -51,13 +59,40 @@ function connectToTracker() {
 }
 
 function forwardToTracker(data) {
+  const framed = data + '\n';
   if (trackerConnected && trackerSocket) {
-    trackerSocket.write(data);
+    trackerSocket.write(framed);
+    lastSendTime = Date.now();
+  } else {
+    const bufferMax = config.network.tracker_forward.buffer_max || 1000;
+    if (sendBuffer.length >= bufferMax) {
+      sendBuffer.shift();
+    }
+    sendBuffer.push(framed);
   }
+}
+
+function startHeartbeat() {
+  if (!config.network.tracker_forward?.enabled) return;
+
+  const intervalSec = config.network.tracker_forward.heartbeat_interval_sec || 10;
+  const nodeId = config.network.node_id;
+  const token = config.network.tracker_forward.token || '';
+
+  heartbeatInterval = setInterval(() => {
+    if (!trackerConnected || !trackerSocket) return;
+    const elapsed = Date.now() - lastSendTime;
+    if (elapsed >= intervalSec * 1000) {
+      const msg = JSON.stringify({ node_id: nodeId, token: token, type: 'heartbeat' }) + '\n';
+      trackerSocket.write(msg);
+      lastSendTime = Date.now();
+    }
+  }, intervalSec * 1000);
 }
 
 // Initialize tracker connection
 connectToTracker();
+startHeartbeat();
 
 // constants
 const PORT = config.network.ports.api;
@@ -206,6 +241,10 @@ const server_detection = net.createServer((socket)=>{
               }
               return bestMatch;
             });
+          }
+          if (config.network.tracker_forward?.enabled) {
+            det.node_id = config.network.node_id;
+            det.token = config.network.tracker_forward.token || '';
           }
           detection = JSON.stringify(det);
           // Forward to external tracker if enabled
