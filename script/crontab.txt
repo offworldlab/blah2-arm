@@ -1,2 +1,3 @@
-# add to /etc/crontab
+# Deployed via owl-os radar_packages role to /etc/cron.d/blah2-rspduo-watchdog
+# RSPduo health check: restart retina-node stack if blah2 API data is stale (>60s)
 */5 * * * *     root    /opt/blah2/script/blah2_rspduo_restart.bash
