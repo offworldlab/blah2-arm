@@ -70,8 +70,8 @@ std::unique_ptr<Source> Capture::factory_source(const std::string& type, c4::yml
     // SDRplay RSPduo
     if (type == VALID_TYPE[0])
     {
-        int agcSetPoint, bandwidthNumber, gainReductionA, gainReductionB, lnaState;
-        bool dabNotch, rfNotch;
+        int agcSetPoint = 0, bandwidthNumber = 0, gainReductionA = 0, gainReductionB = 0, lnaState = 0;
+        bool dabNotch = false, rfNotch = false;
         config["agcSetPoint"] >> agcSetPoint;
         config["bandwidthNumber"] >> bandwidthNumber;
         config["gainReduction"][0] >> gainReductionA;
