@@ -8,7 +8,7 @@ capture:
     type: "RspDuo"
     agcSetPoint: -60
     bandwidthNumber: 0
-    gainReduction: 40 #20-59 dB, higher is less gain
+    gainReduction: [40, 40] #20-59 dB each, [reference, surveillance], higher is less gain
     lnaState: 4 #1-9, higher is more gain
     dabNotch: true
     rfNotch: true
