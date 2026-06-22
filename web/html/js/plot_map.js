@@ -178,7 +178,12 @@ var intervalId = window.setInterval(function () {
                   type: 'scatter',
                   marker: {
                     size: 16,
-                    opacity: 0.6
+                    opacity: 0.9,
+                    color: '#FFFFFF',
+                    line: {
+                      color: '#000000',
+                      width: 1.5
+                    }
                   }
               };
               var trace3 = {
@@ -188,7 +193,12 @@ var intervalId = window.setInterval(function () {
                 type: 'scatter',
                 marker: {
                   size: 16,
-                  opacity: 0.6
+                  opacity: 0.9,
+                  color: '#D55E00',
+                  line: {
+                    color: '#000000',
+                    width: 1.5
+                  }
                 }
             };
 
