@@ -60,6 +60,8 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          build-args: |
+            VERSION=${{ inputs.tag }}
           push: false
           load: true
           tags: ${{ matrix.name }}:${{ inputs.tag }}
