@@ -383,7 +383,6 @@ void RspDuo::set_device_parameters()
     deviceParams->devParams->mode = sdrplay_api_ISOCH;
   }
 
-  // configure channels - these affect both channels identically
   chParams = deviceParams->rxChannelA;
 
   // check for NULL pointer before changing settings
@@ -397,7 +396,8 @@ void RspDuo::set_device_parameters()
   // set center frequency
   chParams->tunerParams.rfFreq.rfHz = fc;
 
-  // set AGC
+  // set AGC - intentionally reference channel (A) only; applying AGC to the
+  // surveillance channel (B) would distort its spectral content and degrade correlation
   chParams->ctrlParams.agc.enable = sdrplay_api_AGC_DISABLE;
   if (agc_bandwidth_nr == 5)
   {
