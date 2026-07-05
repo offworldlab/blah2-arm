@@ -4,7 +4,6 @@ LABEL org.opencontainers.image.source https://github.com/30hours/blah2
 
 WORKDIR /opt/blah2
 ADD lib lib
-
 # Install base dependencies (note: libfftw3-dev removed - building from source with NEON)
 RUN apt-get update && apt-get install -y \
     g++ \
