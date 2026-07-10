@@ -53,6 +53,9 @@ private:
   sdrplay_api_Bw_MHzT bwType;
   /// @brief SDRplay IF mode enum.
   sdrplay_api_If_kHzT ifType;
+  /// @brief True when running from replay() — no real device to update, so
+  /// retune() simulates success against local state only. Test-support only.
+  bool replay_mode_fg;
 
   /// @brief Maximum frequency (Hz).
   static const double MAX_FREQUENCY_NR;
@@ -192,6 +195,24 @@ public:
   /// @param loop True if samples should loop at EOF.
   /// @return Void.
   void replay(IqData *buffer1, IqData *buffer2, std::string file, bool loop);
+
+  /// @brief Live retune fc and per-tuner gain reduction on the open device.
+  /// @details Applies sdrplay_api_Update on the already-initialised device,
+  /// mirroring retina-spectrum's in-place retune pattern. Bounds are
+  /// validated against the same limits as validate().
+  /// @param fc Center frequency (Hz).
+  /// @param gainReductionA Gain reduction for tuner A (dB).
+  /// @param gainReductionB Gain reduction for tuner B (dB).
+  /// @param fcChanged Set true if the applied fc differs from the previous fc.
+  /// @return True if the retune was applied.
+  bool retune(uint32_t fc, int gainReductionA, int gainReductionB,
+    bool &fcChanged) override;
+
+  /// @brief Read per-tuner RF overload state from SDRplay events.
+  /// @param overloadA Set to tuner A overload state.
+  /// @param overloadB Set to tuner B overload state.
+  /// @return True (overload reporting is supported on RspDuo).
+  bool get_overload(bool &overloadA, bool &overloadB) override;
 
 };
 

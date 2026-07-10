@@ -37,6 +37,9 @@ private:
   /// @brief Absolute path of file to replay.
   std::string file;
 
+  /// @brief Last retune generation applied to the device.
+  long lastAppliedRetuneGeneration = 0;
+
 public:
 
   /// @brief Sampling frequency (Hz).

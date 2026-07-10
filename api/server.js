@@ -6,6 +6,7 @@ const dns = require('dns');
 const http = require('http');
 const bistatic = require('./bistatic.js');
 const { extrapolateAdsbData } = require('./lib/extrapolation');
+const retuneLib = require('./lib/retune');
 
 // parse config file
 var config;
@@ -137,6 +138,78 @@ app.get('/capture', (req, res) => {
 app.get('/capture/toggle', (req, res) => {
   capture = !capture;
   res.send('{}');
+});
+
+// live retune state: seeded from the config this stack booted with;
+// generation 0 means "no live retune issued this boot" and blah2 must no-op
+var retune = {
+  generation: 0,
+  fc: config.capture.fc,
+  gainReductionA: config.capture.device.gainReduction[0],
+  gainReductionB: config.capture.device.gainReduction[1],
+};
+// last ack blah2 posted back, or null if none yet
+var retuneStatus = null;
+// last RF/overload status blah2 posted, or null if none yet
+var rfStatus = null;
+
+// blah2 polls this — plain CSV, matching the minimalism of /capture
+app.get('/capture/retune', (req, res) => {
+  res.type('text/plain').send(
+    retune.generation + ',' + retune.fc + ','
+    + retune.gainReductionA + ',' + retune.gainReductionB
+  );
+});
+// request a new candidate tuning (e.g. from retina-gui's Auto-Calibrate)
+app.post('/capture/retune', express.json(), (req, res) => {
+  const { fc, gainReductionA, gainReductionB } = req.body || {};
+  const error = retuneLib.validate(fc, gainReductionA, gainReductionB);
+  if (error) {
+    return res.status(400).json({ success: false, error: error });
+  }
+  retune.generation += 1;
+  retune.fc = fc;
+  retune.gainReductionA = gainReductionA;
+  retune.gainReductionB = gainReductionB;
+  // keep the ADS-B bistatic Doppler calc in sync with the radio's real fc
+  config.capture.fc = fc;
+  res.json({ success: true, generation: retune.generation });
+});
+// blah2 posts here after a retune is actually applied to the device
+app.post('/capture/retune/ack', express.text(), (req, res) => {
+  const parts = String(req.body).split(',').map(Number);
+  if (parts.length === 5 && parts.every(Number.isFinite)) {
+    retuneStatus = {
+      generation: parts[0],
+      fc: parts[1],
+      gainReductionA: parts[2],
+      gainReductionB: parts[3],
+      appliedAt: parts[4],
+      receivedAt: Date.now(),
+    };
+  }
+  res.json({});
+});
+// poll for the last applied retune
+app.get('/capture/retune/status', (req, res) => {
+  res.json(retuneStatus || {});
+});
+// blah2 posts per-tuner RF overload state (on change + heartbeat)
+app.post('/capture/rf-status', express.text(), (req, res) => {
+  const parts = String(req.body).split(',').map(Number);
+  if (parts.length === 3 && parts.every(Number.isFinite)) {
+    rfStatus = {
+      overloadA: parts[0] === 1,
+      overloadB: parts[1] === 1,
+      timestamp: parts[2],
+      receivedAt: Date.now(),
+    };
+  }
+  res.json({});
+});
+// poll for RF overload state
+app.get('/capture/rf-status', (req, res) => {
+  res.json(rfStatus || {});
 });
 app.listen(PORT, HOST, () => {
   console.log(`Running on http://${HOST}:${PORT}`);

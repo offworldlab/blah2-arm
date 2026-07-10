@@ -11,6 +11,8 @@
 #include <fstream>
 #include <unordered_map>
 #include <iostream>
+#include <mutex>
+#include <atomic>
 
 // class static constants
 const double RspDuo::MAX_FREQUENCY_NR = 2000000000;
@@ -27,6 +29,14 @@ sdrplay_api_DeviceParamsT *deviceParams = NULL;
 sdrplay_api_ErrT err;
 sdrplay_api_CallbackFnsT cbFns;
 sdrplay_api_RxChannelParamsT *chParams;
+// serialises sdrplay_api_Update() calls: the SDRplay event-callback thread
+// (overload acks) and the retune-poll thread both call it on the same device
+std::mutex sdrplay_update_mutex;
+// true once initialise_device() has run and the device accepts live updates
+std::atomic<bool> device_ready_fg{false};
+// per-tuner RF overload state from sdrplay_api_PowerOverloadChange events
+std::atomic<bool> overload_a_fg{false};
+std::atomic<bool> overload_b_fg{false};
 
 // global variables
 FILE *file_replay = NULL;
@@ -78,6 +88,7 @@ RspDuo::RspDuo(std::string _type, uint32_t _fc,
   bwType = ifBandwidthMap[fs];
   ifType = ifModeMap[fs];
   usb_bulk_fg = false;
+  replay_mode_fg = false;
   capture_fg = saveIq;
   saveIqFileLocal = &saveIqFile;
   agc_bandwidth_nr = _bandwidthNumber;
@@ -109,22 +120,28 @@ void RspDuo::process(IqData *_buffer1, IqData *_buffer2)
 
   initialise_device();
 
-  // update gains after initialization
-  if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_A,
+  {
+    std::lock_guard<std::mutex> lock(sdrplay_update_mutex);
+
+    // update gains after initialization
+    if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_A,
+                        sdrplay_api_Update_Tuner_Gr,
+                        sdrplay_api_Update_Ext1_None)) != sdrplay_api_Success) {
+        std::cerr << "Failed to update Tuner A gain: " << sdrplay_api_GetErrorString(err) << std::endl;
+        sdrplay_api_Close();
+        exit(1);
+    }
+
+    if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_B,
                       sdrplay_api_Update_Tuner_Gr,
                       sdrplay_api_Update_Ext1_None)) != sdrplay_api_Success) {
-      std::cerr << "Failed to update Tuner A gain: " << sdrplay_api_GetErrorString(err) << std::endl;
-      sdrplay_api_Close();
-      exit(1);
+        std::cerr << "Failed to update Tuner B gain: " << sdrplay_api_GetErrorString(err) << std::endl;
+        sdrplay_api_Close();
+        exit(1);
+    }
   }
 
-  if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_B,
-                    sdrplay_api_Update_Tuner_Gr,
-                    sdrplay_api_Update_Ext1_None)) != sdrplay_api_Success) {
-      std::cerr << "Failed to update Tuner B gain: " << sdrplay_api_GetErrorString(err) << std::endl;
-      sdrplay_api_Close();
-      exit(1);
-  }
+  device_ready_fg.store(true);
 
   // control loop
   while (run_fg)
@@ -140,10 +157,105 @@ void RspDuo::process(IqData *_buffer1, IqData *_buffer2)
   }
 }
 
+bool RspDuo::retune(uint32_t _fc, int _gainReductionA, int _gainReductionB,
+  bool &fcChanged)
+{
+  fcChanged = false;
+
+  if (!device_ready_fg.load())
+  {
+    std::cerr << "[RspDuo] Retune rejected: device not ready" << std::endl;
+    return false;
+  }
+  if (_fc < 1 || _fc > MAX_FREQUENCY_NR)
+  {
+    std::cerr << "[RspDuo] Retune rejected: fc out of range" << std::endl;
+    return false;
+  }
+  if (_gainReductionA < MIN_GAIN_REDUCTION_NR || _gainReductionA > MAX_GAIN_REDUCTION_NR ||
+      _gainReductionB < MIN_GAIN_REDUCTION_NR || _gainReductionB > MAX_GAIN_REDUCTION_NR)
+  {
+    std::cerr << "[RspDuo] Retune rejected: gain reduction out of range" << std::endl;
+    return false;
+  }
+
+  std::lock_guard<std::mutex> lock(sdrplay_update_mutex);
+
+  bool changed = (_fc != fc);
+
+  if (replay_mode_fg)
+  {
+    // No real SDRplay device in replay mode (chosenDevice/deviceParams/
+    // chParams are never populated) — simulate a successful retune against
+    // local state only, so the ack/TuneState/tracker-reset chain is
+    // exercisable without hardware.
+    fc = _fc;
+    gain_reduction_nr_a = _gainReductionA;
+    gain_reduction_nr_b = _gainReductionB;
+    fcChanged = changed;
+    return true;
+  }
+
+  if (changed)
+  {
+    // rfFreq lives on channel A only; in dual-tuner mode the frequency is
+    // shared, so the update targets the device's own tuner selection (Both)
+    chParams->tunerParams.rfFreq.rfHz = _fc;
+    if ((err = sdrplay_api_Update(chosenDevice->dev, chosenDevice->tuner,
+          sdrplay_api_Update_Tuner_Frf,
+          sdrplay_api_Update_Ext1_None)) != sdrplay_api_Success)
+    {
+      std::cerr << "[RspDuo] Retune fc failed: " <<
+        sdrplay_api_GetErrorString(err) << std::endl;
+      chParams->tunerParams.rfFreq.rfHz = fc;
+      return false;
+    }
+    fc = _fc;
+  }
+
+  deviceParams->rxChannelA->tunerParams.gain.gRdB = _gainReductionA;
+  deviceParams->rxChannelB->tunerParams.gain.gRdB = _gainReductionB;
+  if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_A,
+        sdrplay_api_Update_Tuner_Gr,
+        sdrplay_api_Update_Ext1_None)) != sdrplay_api_Success)
+  {
+    std::cerr << "[RspDuo] Retune Tuner A gain failed: " <<
+      sdrplay_api_GetErrorString(err) << std::endl;
+    return false;
+  }
+  if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_B,
+        sdrplay_api_Update_Tuner_Gr,
+        sdrplay_api_Update_Ext1_None)) != sdrplay_api_Success)
+  {
+    std::cerr << "[RspDuo] Retune Tuner B gain failed: " <<
+      sdrplay_api_GetErrorString(err) << std::endl;
+    return false;
+  }
+  gain_reduction_nr_a = _gainReductionA;
+  gain_reduction_nr_b = _gainReductionB;
+
+  fcChanged = changed;
+  return true;
+}
+
+bool RspDuo::get_overload(bool &overloadA, bool &overloadB)
+{
+  overloadA = overload_a_fg.load();
+  overloadB = overload_b_fg.load();
+  return true;
+}
+
 void RspDuo::replay(IqData *_buffer1, IqData *_buffer2, std::string _file, bool _loop)
 {
   buffer1 = _buffer1;
   buffer2 = _buffer2;
+
+  // No real device to update in replay mode — retune() simulates success
+  // against local state instead of touching the (uninitialised) SDRplay
+  // pointers, so the retune/ack/tracker-reset chain is testable without
+  // hardware.
+  replay_mode_fg = true;
+  device_ready_fg.store(true);
 
   short i1, q1, i2, q2;
   int rv;
@@ -560,15 +672,29 @@ void *cbContext)
     break;
 
   case sdrplay_api_PowerOverloadChange:
+  {
+    bool detected = (params->powerOverloadParams.powerOverloadChangeType
+      == sdrplay_api_Overload_Detected);
     std::cerr << "[RspDuo] PowerOverloadChange, tuner=" << tuner_str << " ";
-    std::cerr << "powerOverloadChangeType=" << 
-      ((params->powerOverloadParams.powerOverloadChangeType 
-      == sdrplay_api_Overload_Detected) ? "sdrplay_api_Overload_Detected" : 
+    std::cerr << "powerOverloadChangeType=" <<
+      (detected ? "sdrplay_api_Overload_Detected" :
       "sdrplay_api_Overload_Corrected") << std::endl;
+    if (tuner == sdrplay_api_Tuner_A)
+    {
+      overload_a_fg.store(detected);
+    }
+    else
+    {
+      overload_b_fg.store(detected);
+    }
     // send update message to acknowledge power overload message received
-    sdrplay_api_Update(chosenDevice->dev, tuner, 
-      sdrplay_api_Update_Ctrl_OverloadMsgAck, sdrplay_api_Update_Ext1_None);
+    {
+      std::lock_guard<std::mutex> lock(sdrplay_update_mutex);
+      sdrplay_api_Update(chosenDevice->dev, tuner,
+        sdrplay_api_Update_Ctrl_OverloadMsgAck, sdrplay_api_Update_Ext1_None);
+    }
     break;
+  }
 
   case sdrplay_api_DeviceRemoved:
     std::cerr << "[RspDuo] Device removed" << std::endl;
@@ -593,6 +719,7 @@ void RspDuo::initialise_device()
 
 void RspDuo::uninitialise_device()
 {
+  device_ready_fg.store(false);
   if ((err = sdrplay_api_Uninit(chosenDevice->dev)) != sdrplay_api_Success)
   {
     std::cerr << "Error: sdrplay_api_Uninit failed " << 

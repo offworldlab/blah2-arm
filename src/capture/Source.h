@@ -67,8 +67,25 @@ public:
   /// @param file Path to file to replay data from.
   /// @param loop True if samples should loop at EOF.
   /// @return Void.
-  virtual void replay(IqData *buffer1, IqData *buffer2, 
+  virtual void replay(IqData *buffer1, IqData *buffer2,
     std::string file, bool loop) = 0;
+
+  /// @brief Live retune without restarting capture.
+  /// @param fc Center frequency (Hz).
+  /// @param gainReductionA Gain reduction for tuner A (dB).
+  /// @param gainReductionB Gain reduction for tuner B (dB).
+  /// @param fcChanged Set true if the applied fc differs from the previous fc.
+  /// @return True if the retune was applied. Default: unsupported.
+  virtual bool retune(uint32_t fc, int gainReductionA, int gainReductionB,
+    bool &fcChanged) { (void)fc; (void)gainReductionA; (void)gainReductionB;
+    (void)fcChanged; return false; }
+
+  /// @brief Read per-tuner RF overload state.
+  /// @param overloadA Set to tuner A overload state.
+  /// @param overloadB Set to tuner B overload state.
+  /// @return True if overload reporting is supported. Default: unsupported.
+  virtual bool get_overload(bool &overloadA, bool &overloadB)
+    { (void)overloadA; (void)overloadB; return false; }
 
   /// @brief Open a new file to record IQ.
   /// @details First creates a new file from current timestamp.
