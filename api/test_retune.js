@@ -67,14 +67,18 @@ async function waitForServer(timeoutMs) {
 
 function testValidate() {
   console.log('lib/retune.validate:');
-  check('valid request', retuneLib.validate(98000000, 20, 59) === null);
-  check('fc too low', retuneLib.validate(0, 40, 40) !== null);
-  check('fc too high', retuneLib.validate(2000000001, 40, 40) !== null);
-  check('fc non-numeric', retuneLib.validate('98e6', 40, 40) !== null);
-  check('gainA too low', retuneLib.validate(98000000, 19, 40) !== null);
-  check('gainB too high', retuneLib.validate(98000000, 40, 60) !== null);
-  check('gain non-integer', retuneLib.validate(98000000, 40.5, 40) !== null);
-  check('gain missing', retuneLib.validate(98000000, undefined, 40) !== null);
+  check('valid request', retuneLib.validate(98000000, 20, 59, 4) === null);
+  check('fc too low', retuneLib.validate(0, 40, 40, 4) !== null);
+  check('fc too high', retuneLib.validate(2000000001, 40, 40, 4) !== null);
+  check('fc non-numeric', retuneLib.validate('98e6', 40, 40, 4) !== null);
+  check('gainA too low', retuneLib.validate(98000000, 19, 40, 4) !== null);
+  check('gainB too high', retuneLib.validate(98000000, 40, 60, 4) !== null);
+  check('gain non-integer', retuneLib.validate(98000000, 40.5, 40, 4) !== null);
+  check('gain missing', retuneLib.validate(98000000, undefined, 40, 4) !== null);
+  check('lnaState too low', retuneLib.validate(98000000, 40, 40, 0) !== null);
+  check('lnaState too high', retuneLib.validate(98000000, 40, 40, 10) !== null);
+  check('lnaState non-integer', retuneLib.validate(98000000, 40, 40, 4.5) !== null);
+  check('lnaState missing', retuneLib.validate(98000000, 40, 40, undefined) !== null);
 }
 
 async function testEndpoints() {
@@ -83,7 +87,7 @@ async function testEndpoints() {
   // initial state: generation 0, config-seeded values
   let res = await request('GET', '/capture/retune');
   check('initial GET is CSV with generation 0',
-    res.status === 200 && res.body === '0,98000000,40,41');
+    res.status === 200 && res.body === '0,98000000,40,41,4');
 
   res = await request('GET', '/capture/retune/status');
   check('initial status is empty', res.status === 200 && res.body === '{}');
@@ -93,35 +97,38 @@ async function testEndpoints() {
 
   // invalid request is rejected and does not bump generation
   res = await request('POST', '/capture/retune',
-    { fc: 98000000, gainReductionA: 5, gainReductionB: 40 });
+    { fc: 98000000, gainReductionA: 5, gainReductionB: 40, lnaState: 4 });
   check('invalid POST returns 400', res.status === 400);
   res = await request('GET', '/capture/retune');
   check('generation unchanged after invalid POST', res.body.startsWith('0,'));
 
   // valid request bumps generation and updates the CSV
   res = await request('POST', '/capture/retune',
-    { fc: 105100000, gainReductionA: 20, gainReductionB: 30 });
+    { fc: 105100000, gainReductionA: 20, gainReductionB: 30, lnaState: 4 });
   check('valid POST returns generation 1',
     res.status === 200 && JSON.parse(res.body).generation === 1);
   res = await request('GET', '/capture/retune');
-  check('GET reflects new candidate', res.body === '1,105100000,20,30');
+  check('GET reflects new candidate', res.body === '1,105100000,20,30,4');
 
-  // second request bumps again (monotonic)
+  // second request bumps again (monotonic), lnaState escalated
   res = await request('POST', '/capture/retune',
-    { fc: 105100000, gainReductionA: 25, gainReductionB: 30 });
+    { fc: 105100000, gainReductionA: 25, gainReductionB: 30, lnaState: 5 });
   check('second POST returns generation 2',
     JSON.parse(res.body).generation === 2);
+  res = await request('GET', '/capture/retune');
+  check('GET reflects escalated lnaState', res.body === '2,105100000,25,30,5');
 
   // ack round trip (what blah2 posts after applying)
   const appliedAt = Date.now();
   res = await request('POST', '/capture/retune/ack',
-    `2,105100000,25,30,${appliedAt}`);
+    `2,105100000,25,30,5,${appliedAt}`);
   check('ack accepted', res.status === 200);
   res = await request('GET', '/capture/retune/status');
   const status = JSON.parse(res.body);
   check('status echoes ack', status.generation === 2
     && status.fc === 105100000 && status.gainReductionA === 25
-    && status.gainReductionB === 30 && status.appliedAt === appliedAt
+    && status.gainReductionB === 30 && status.lnaState === 5
+    && status.appliedAt === appliedAt
     && typeof status.receivedAt === 'number');
 
   // malformed ack is ignored, status unchanged
@@ -164,6 +171,7 @@ capture:
   fc: 98000000
   device:
     gainReduction: [40, 41]
+    lnaState: 4
 truth:
   adsb:
     enabled: false

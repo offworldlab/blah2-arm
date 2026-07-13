@@ -65,6 +65,8 @@ private:
   static const int MIN_GAIN_REDUCTION_NR;
   /// @brief Maximum gain reduction.
   static const int MAX_GAIN_REDUCTION_NR;
+  /// @brief Min LNA state.
+  static const int MIN_LNA_STATE_NR;
   /// @brief Max LNA state.
   static const int MAX_LNA_STATE_NR;
   /// @brief Default sample rate.
@@ -196,17 +198,21 @@ public:
   /// @return Void.
   void replay(IqData *buffer1, IqData *buffer2, std::string file, bool loop);
 
-  /// @brief Live retune fc and per-tuner gain reduction on the open device.
+  /// @brief Live retune fc, per-tuner gain reduction and LNA state on the
+  /// open device.
   /// @details Applies sdrplay_api_Update on the already-initialised device,
   /// mirroring retina-spectrum's in-place retune pattern. Bounds are
-  /// validated against the same limits as validate().
+  /// validated against the same limits as validate(). LNA state is shared
+  /// across both tuners (the SDRplay device has no independent per-tuner
+  /// LNA control), unlike gain reduction.
   /// @param fc Center frequency (Hz).
   /// @param gainReductionA Gain reduction for tuner A (dB).
   /// @param gainReductionB Gain reduction for tuner B (dB).
+  /// @param lnaState LNA state (shared across both tuners).
   /// @param fcChanged Set true if the applied fc differs from the previous fc.
   /// @return True if the retune was applied.
   bool retune(uint32_t fc, int gainReductionA, int gainReductionB,
-    bool &fcChanged) override;
+    int lnaState, bool &fcChanged) override;
 
   /// @brief Read per-tuner RF overload state from SDRplay events.
   /// @param overloadA Set to tuner A overload state.

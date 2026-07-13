@@ -19,6 +19,7 @@ const double RspDuo::MAX_FREQUENCY_NR = 2000000000;
 const int RspDuo::MIN_AGC_SET_POINT_NR = -72;        // min agc set point
 const int RspDuo::MIN_GAIN_REDUCTION_NR = 20;        // min gain reduction
 const int RspDuo::MAX_GAIN_REDUCTION_NR = 59;        // max gain reduction
+const int RspDuo::MIN_LNA_STATE_NR = 1;              // min lna state
 const int RspDuo::MAX_LNA_STATE_NR = 9;              // max lna state
 const int RspDuo::DEF_SAMPLE_RATE_NR = 2000000;      // default sample rate
 
@@ -158,7 +159,7 @@ void RspDuo::process(IqData *_buffer1, IqData *_buffer2)
 }
 
 bool RspDuo::retune(uint32_t _fc, int _gainReductionA, int _gainReductionB,
-  bool &fcChanged)
+  int _lnaState, bool &fcChanged)
 {
   fcChanged = false;
 
@@ -178,6 +179,11 @@ bool RspDuo::retune(uint32_t _fc, int _gainReductionA, int _gainReductionB,
     std::cerr << "[RspDuo] Retune rejected: gain reduction out of range" << std::endl;
     return false;
   }
+  if (_lnaState < MIN_LNA_STATE_NR || _lnaState > MAX_LNA_STATE_NR)
+  {
+    std::cerr << "[RspDuo] Retune rejected: lna state out of range" << std::endl;
+    return false;
+  }
 
   std::lock_guard<std::mutex> lock(sdrplay_update_mutex);
 
@@ -192,6 +198,7 @@ bool RspDuo::retune(uint32_t _fc, int _gainReductionA, int _gainReductionB,
     fc = _fc;
     gain_reduction_nr_a = _gainReductionA;
     gain_reduction_nr_b = _gainReductionB;
+    lna_state_nr = _lnaState;
     fcChanged = changed;
     return true;
   }
@@ -213,8 +220,14 @@ bool RspDuo::retune(uint32_t _fc, int _gainReductionA, int _gainReductionB,
     fc = _fc;
   }
 
+  // gRdB and LNAstate are both applied via the same Update_Tuner_Gr reason
+  // (see SDRplay API Specification 3.14) — LNA state has no independent
+  // update reason of its own. It has no per-tuner control on this device,
+  // so the same value is written to both channels.
   deviceParams->rxChannelA->tunerParams.gain.gRdB = _gainReductionA;
+  deviceParams->rxChannelA->tunerParams.gain.LNAstate = _lnaState;
   deviceParams->rxChannelB->tunerParams.gain.gRdB = _gainReductionB;
+  deviceParams->rxChannelB->tunerParams.gain.LNAstate = _lnaState;
   if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_A,
         sdrplay_api_Update_Tuner_Gr,
         sdrplay_api_Update_Ext1_None)) != sdrplay_api_Success)
@@ -233,6 +246,7 @@ bool RspDuo::retune(uint32_t _fc, int _gainReductionA, int _gainReductionB,
   }
   gain_reduction_nr_a = _gainReductionA;
   gain_reduction_nr_b = _gainReductionB;
+  lna_state_nr = _lnaState;
 
   fcChanged = changed;
   return true;
@@ -319,8 +333,9 @@ void RspDuo::validate() {
         std::cerr << "Error: Gain reduction must be between " << MIN_GAIN_REDUCTION_NR << " and " << MAX_GAIN_REDUCTION_NR << std::endl;
         exit(1);
     }
-    if (lna_state_nr < 1 || lna_state_nr > MAX_LNA_STATE_NR) {
-        std::cerr << "Error: LNA state must be between 1 and " << MAX_LNA_STATE_NR << std::endl;
+    if (lna_state_nr < MIN_LNA_STATE_NR || lna_state_nr > MAX_LNA_STATE_NR) {
+        std::cerr << "Error: LNA state must be between " << MIN_LNA_STATE_NR
+          << " and " << MAX_LNA_STATE_NR << std::endl;
         exit(1);
     }
 

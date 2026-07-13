@@ -74,11 +74,12 @@ public:
   /// @param fc Center frequency (Hz).
   /// @param gainReductionA Gain reduction for tuner A (dB).
   /// @param gainReductionB Gain reduction for tuner B (dB).
+  /// @param lnaState LNA state (shared across both tuners).
   /// @param fcChanged Set true if the applied fc differs from the previous fc.
   /// @return True if the retune was applied. Default: unsupported.
   virtual bool retune(uint32_t fc, int gainReductionA, int gainReductionB,
-    bool &fcChanged) { (void)fc; (void)gainReductionA; (void)gainReductionB;
-    (void)fcChanged; return false; }
+    int lnaState, bool &fcChanged) { (void)fc; (void)gainReductionA;
+    (void)gainReductionB; (void)lnaState; (void)fcChanged; return false; }
 
   /// @brief Read per-tuner RF overload state.
   /// @param overloadA Set to tuner A overload state.

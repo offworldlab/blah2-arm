@@ -72,13 +72,13 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
       {
         long generation = 0;
         unsigned int newFc = 0;
-        int newGainA = 0, newGainB = 0;
-        if (sscanf(res->body.c_str(), "%ld,%u,%d,%d",
-              &generation, &newFc, &newGainA, &newGainB) == 4
+        int newGainA = 0, newGainB = 0, newLnaState = 0;
+        if (sscanf(res->body.c_str(), "%ld,%u,%d,%d,%d",
+              &generation, &newFc, &newGainA, &newGainB, &newLnaState) == 5
             && generation > 0 && generation > lastAppliedRetuneGeneration)
         {
           bool fcChanged = false;
-          if (device->retune(newFc, newGainA, newGainB, fcChanged))
+          if (device->retune(newFc, newGainA, newGainB, newLnaState, fcChanged))
           {
             lastAppliedRetuneGeneration = generation;
             fc = newFc;
@@ -93,6 +93,7 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
               + std::to_string(newFc) + ","
               + std::to_string(newGainA) + ","
               + std::to_string(newGainB) + ","
+              + std::to_string(newLnaState) + ","
               + std::to_string(now);
             cli.Post("/capture/retune/ack", ack, "text/plain");
           }

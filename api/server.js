@@ -147,6 +147,7 @@ var retune = {
   fc: config.capture.fc,
   gainReductionA: config.capture.device.gainReduction[0],
   gainReductionB: config.capture.device.gainReduction[1],
+  lnaState: config.capture.device.lnaState,
 };
 // last ack blah2 posted back, or null if none yet
 var retuneStatus = null;
@@ -157,13 +158,14 @@ var rfStatus = null;
 app.get('/capture/retune', (req, res) => {
   res.type('text/plain').send(
     retune.generation + ',' + retune.fc + ','
-    + retune.gainReductionA + ',' + retune.gainReductionB
+    + retune.gainReductionA + ',' + retune.gainReductionB + ','
+    + retune.lnaState
   );
 });
 // request a new candidate tuning (e.g. from retina-gui's Auto-Calibrate)
 app.post('/capture/retune', express.json(), (req, res) => {
-  const { fc, gainReductionA, gainReductionB } = req.body || {};
-  const error = retuneLib.validate(fc, gainReductionA, gainReductionB);
+  const { fc, gainReductionA, gainReductionB, lnaState } = req.body || {};
+  const error = retuneLib.validate(fc, gainReductionA, gainReductionB, lnaState);
   if (error) {
     return res.status(400).json({ success: false, error: error });
   }
@@ -171,6 +173,7 @@ app.post('/capture/retune', express.json(), (req, res) => {
   retune.fc = fc;
   retune.gainReductionA = gainReductionA;
   retune.gainReductionB = gainReductionB;
+  retune.lnaState = lnaState;
   // keep the ADS-B bistatic Doppler calc in sync with the radio's real fc
   config.capture.fc = fc;
   res.json({ success: true, generation: retune.generation });
@@ -178,13 +181,14 @@ app.post('/capture/retune', express.json(), (req, res) => {
 // blah2 posts here after a retune is actually applied to the device
 app.post('/capture/retune/ack', express.text(), (req, res) => {
   const parts = String(req.body).split(',').map(Number);
-  if (parts.length === 5 && parts.every(Number.isFinite)) {
+  if (parts.length === 6 && parts.every(Number.isFinite)) {
     retuneStatus = {
       generation: parts[0],
       fc: parts[1],
       gainReductionA: parts[2],
       gainReductionB: parts[3],
-      appliedAt: parts[4],
+      lnaState: parts[4],
+      appliedAt: parts[5],
       receivedAt: Date.now(),
     };
   }
