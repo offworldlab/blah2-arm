@@ -67,8 +67,15 @@ public:
   /// @param file Path to file to replay data from.
   /// @param loop True if samples should loop at EOF.
   /// @return Void.
-  virtual void replay(IqData *buffer1, IqData *buffer2, 
+  virtual void replay(IqData *buffer1, IqData *buffer2,
     std::string file, bool loop) = 0;
+
+  /// @brief Read per-tuner peak sample level since the last read.
+  /// @param dbfsA Set to tuner A peak level (dBFS, 0 = full scale).
+  /// @param dbfsB Set to tuner B peak level (dBFS, 0 = full scale).
+  /// @return True if peak dBFS reporting is supported. Default: unsupported.
+  virtual bool get_peak_dbfs(double &dbfsA, double &dbfsB)
+    { (void)dbfsA; (void)dbfsB; return false; }
 
   /// @brief Open a new file to record IQ.
   /// @details First creates a new file from current timestamp.
