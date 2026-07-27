@@ -152,7 +152,7 @@ var retune = {
 // last ack blah2 posted back, or null if none yet
 var retuneStatus = null;
 // last RF/overload status blah2 posted, or null if none yet
-var rfStatus = null;
+var overloadStatus = null;
 
 // blah2 polls this — plain CSV, matching the minimalism of /capture
 app.get('/capture/retune', (req, res) => {
@@ -198,11 +198,15 @@ app.post('/capture/retune/ack', express.text(), (req, res) => {
 app.get('/capture/retune/status', (req, res) => {
   res.json(retuneStatus || {});
 });
-// blah2 posts per-tuner RF overload state (on change + heartbeat)
-app.post('/capture/rf-status', express.text(), (req, res) => {
+// blah2 posts per-tuner RF overload state (on change + heartbeat). Deliberately
+// its own endpoint, not /capture/rf-status — that path already belongs to the
+// (unrelated) peak-dBFS meter feature; no consumer needs both in one call, so
+// keeping them on separate endpoints avoids coupling two independent features
+// together just because they both report "something about RF status."
+app.post('/capture/overload-status', express.text(), (req, res) => {
   const parts = String(req.body).split(',').map(Number);
   if (parts.length === 3 && parts.every(Number.isFinite)) {
-    rfStatus = {
+    overloadStatus = {
       overloadA: parts[0] === 1,
       overloadB: parts[1] === 1,
       timestamp: parts[2],
@@ -212,8 +216,8 @@ app.post('/capture/rf-status', express.text(), (req, res) => {
   res.json({});
 });
 // poll for RF overload state
-app.get('/capture/rf-status', (req, res) => {
-  res.json(rfStatus || {});
+app.get('/capture/overload-status', (req, res) => {
+  res.json(overloadStatus || {});
 });
 app.listen(PORT, HOST, () => {
   console.log(`Running on http://${HOST}:${PORT}`);

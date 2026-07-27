@@ -119,7 +119,7 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
             std::chrono::system_clock::now().time_since_epoch()).count();
           std::string body = std::string(overloadA ? "1" : "0") + ","
             + (overloadB ? "1" : "0") + "," + std::to_string(now);
-          if (cli.Post("/capture/rf-status", body, "text/plain"))
+          if (cli.Post("/capture/overload-status", body, "text/plain"))
           {
             lastOverloadA = overloadA;
             lastOverloadB = overloadB;

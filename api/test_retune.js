@@ -1,8 +1,8 @@
-// Ad-hoc test for the /capture/retune and /capture/rf-status endpoints.
+// Ad-hoc test for the /capture/retune and /capture/overload-status endpoints.
 // Boots server.js as a child process on high ports with a minimal config,
 // then exercises the full round trip over real HTTP:
 //   POST /capture/retune -> GET /capture/retune -> POST /capture/retune/ack
-//   -> GET /capture/retune/status -> POST /capture/rf-status -> GET same.
+//   -> GET /capture/retune/status -> POST /capture/overload-status -> GET same.
 // Run with: node test_retune.js
 
 const http = require('http');
@@ -92,8 +92,8 @@ async function testEndpoints() {
   res = await request('GET', '/capture/retune/status');
   check('initial status is empty', res.status === 200 && res.body === '{}');
 
-  res = await request('GET', '/capture/rf-status');
-  check('initial rf-status is empty', res.status === 200 && res.body === '{}');
+  res = await request('GET', '/capture/overload-status');
+  check('initial overload-status is empty', res.status === 200 && res.body === '{}');
 
   // invalid request is rejected and does not bump generation
   res = await request('POST', '/capture/retune',
@@ -138,12 +138,12 @@ async function testEndpoints() {
   check('status unchanged after malformed ack',
     JSON.parse(res.body).generation === 2);
 
-  // rf-status round trip
-  res = await request('POST', '/capture/rf-status', `1,0,${Date.now()}`);
-  check('rf-status accepted', res.status === 200);
-  res = await request('GET', '/capture/rf-status');
+  // overload-status round trip
+  res = await request('POST', '/capture/overload-status', `1,0,${Date.now()}`);
+  check('overload-status accepted', res.status === 200);
+  res = await request('GET', '/capture/overload-status');
   const rf = JSON.parse(res.body);
-  check('rf-status echoes overload flags',
+  check('overload-status echoes overload flags',
     rf.overloadA === true && rf.overloadB === false
     && typeof rf.timestamp === 'number');
 
