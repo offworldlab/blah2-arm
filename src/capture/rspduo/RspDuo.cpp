@@ -109,6 +109,12 @@ void RspDuo::process(IqData *_buffer1, IqData *_buffer2)
 
   initialise_device();
 
+  // set gain reduction and lna state
+  deviceParams->rxChannelA->tunerParams.gain.gRdB = gain_reduction_nr_a;
+  deviceParams->rxChannelA->tunerParams.gain.LNAstate = lna_state_nr;
+  deviceParams->rxChannelB->tunerParams.gain.gRdB = gain_reduction_nr_b;
+  deviceParams->rxChannelB->tunerParams.gain.LNAstate = lna_state_nr;
+
   // update gains after initialization
   if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_A,
                       sdrplay_api_Update_Tuner_Gr,

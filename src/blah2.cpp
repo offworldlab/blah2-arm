@@ -37,6 +37,12 @@
 #include <cstdlib>
 
 Capture *CAPTURE_POINTER = NULL;
+std::unique_ptr<Socket> socket_map;
+std::unique_ptr<Socket> socket_detection;
+std::unique_ptr<Socket> socket_track;
+std::unique_ptr<Socket> socket_timestamp;
+std::unique_ptr<Socket> socket_timing;
+std::unique_ptr<Socket> socket_iqdata;
 
 void signal_callback_handler(int signum);
 void getopt_print_help();
@@ -56,7 +62,7 @@ int main(int argc, char **argv)
   std::ifstream filePath(file);
   if (!filePath.is_open())
   {
-    std::cout << "Error: Config file does not exist." << std::endl;
+    std::cout << "Error: Config file does not exist." << "\n";
     exit(1);
   }
 
@@ -64,7 +70,7 @@ int main(int argc, char **argv)
   std::string contents = ryml_get_file(file.c_str());
   ryml::Tree tree = ryml::parse_in_arena(ryml::to_csubstr(contents));
 
-  // setup capture
+  // set up capture
   uint32_t fs, fc;
   uint16_t port_capture;
   std::string type, path, replayFile, ip_capture;
@@ -79,6 +85,41 @@ int main(int argc, char **argv)
   tree["capture"]["replay"]["file"] >> replayFile;
   tree["network"]["ip"] >> ip_capture;
   tree["network"]["ports"]["api"] >> port_capture;
+
+  // set up socket
+  sleep(2);
+  uint16_t port_map, port_detection, port_timestamp, 
+    port_timing, port_iqdata, port_track;
+  std::string ip;
+  tree["network"]["ports"]["map"] >> port_map;
+  tree["network"]["ports"]["detection"] >> port_detection;
+  tree["network"]["ports"]["track"] >> port_track;
+  tree["network"]["ports"]["timestamp"] >> port_timestamp;
+  tree["network"]["ports"]["timing"] >> port_timing;
+  tree["network"]["ports"]["iqdata"] >> port_iqdata;
+  tree["network"]["ip"] >> ip;
+  
+  try {
+    socket_map = std::make_unique<Socket>(ip, port_map);
+    socket_detection = std::make_unique<Socket>(ip, port_detection);
+    socket_track = std::make_unique<Socket>(ip, port_track);
+    socket_timestamp = std::make_unique<Socket>(ip, port_timestamp);
+    socket_timing = std::make_unique<Socket>(ip, port_timing);
+    socket_iqdata = std::make_unique<Socket>(ip, port_iqdata);
+  } catch (const std::exception& e) {
+    std::cerr << "Failed to initialize socket connections: " << e.what() << "\n";
+    std::cerr << "Make sure the server at " << ip << " is reachable." << "\n";
+    return 1;
+  }
+
+  // set up fftw multithread
+  if (fftw_init_threads() == 0)
+  {
+    std::cout << "Error in FFTW multithreading." << "\n";
+    return -1;
+  }
+  fftw_plan_with_nthreads(4);
+
   Capture *capture = new Capture(type, fs, fc, path);
   CAPTURE_POINTER = capture;
   if (state)
@@ -106,7 +147,7 @@ int main(int argc, char **argv)
     tree["capture"]["device"], ip_capture, port_capture, verbose);
   });
 
-  // setup process CPI
+  // set up process CPI
   uint32_t nSamples = fs * tCpi;
   IqData *x = new IqData(nSamples);
   IqData *y = new IqData(nSamples);
@@ -116,34 +157,7 @@ int main(int argc, char **argv)
   std::unique_ptr<Detection> detection2;
   std::unique_ptr<Track> track;
 
-  // setup fftw multithread
-  if (fftw_init_threads() == 0)
-  {
-    std::cout << "Error in FFTW multithreading." << std::endl;
-    return -1;
-  }
-  fftw_plan_with_nthreads(4);
-
-  // setup socket
-  sleep(5);
-  uint16_t port_map, port_detection, port_timestamp, 
-    port_timing, port_iqdata, port_track;
-  std::string ip;
-  tree["network"]["ports"]["map"] >> port_map;
-  tree["network"]["ports"]["detection"] >> port_detection;
-  tree["network"]["ports"]["track"] >> port_track;
-  tree["network"]["ports"]["timestamp"] >> port_timestamp;
-  tree["network"]["ports"]["timing"] >> port_timing;
-  tree["network"]["ports"]["iqdata"] >> port_iqdata;
-  tree["network"]["ip"] >> ip;
-  Socket socket_map(ip, port_map);
-  Socket socket_detection(ip, port_detection);
-  Socket socket_track(ip, port_track);
-  Socket socket_timestamp(ip, port_timestamp);
-  Socket socket_timing(ip, port_timing);
-  Socket socket_iqdata(ip, port_iqdata);
-
-  // setup process ambiguity
+  // set up process ambiguity
   int32_t delayMin, delayMax;
   int32_t dopplerMin, dopplerMax;
   bool roundHamming = true;
@@ -154,13 +168,13 @@ int main(int argc, char **argv)
   Ambiguity *ambiguity = new Ambiguity(delayMin, delayMax, 
     dopplerMin, dopplerMax, fs, nSamples, roundHamming);
 
-  // setup process clutter
+  // set up process clutter
   int32_t delayMinClutter, delayMaxClutter;
   tree["process"]["clutter"]["delayMin"] >> delayMinClutter;
   tree["process"]["clutter"]["delayMax"] >> delayMaxClutter;
   WienerHopf *filter = new WienerHopf(delayMinClutter, delayMaxClutter, nSamples);
 
-  // setup process detection
+  // set up process detection
   double pfa, minDoppler;
   int8_t nGuard, nTrain;
   int8_t minDelay;
@@ -172,12 +186,12 @@ int main(int argc, char **argv)
   CfarDetector1D *cfarDetector1D = new CfarDetector1D(pfa, nGuard, nTrain, minDelay, minDoppler);
   Interpolate *interpolate = new Interpolate(true, true);
 
-  // setup process centroid
+  // set up process centroid
   uint16_t nCentroid;
   tree["process"]["detection"]["nCentroid"] >> nCentroid;
   Centroid *centroid = new Centroid(nCentroid, nCentroid, 1/tCpi);
 
-  // setup process tracker
+  // set up process tracker
   uint8_t m, n, nDelete;
   double maxAcc, rangeRes, lambda;
   std::string smooth;
@@ -189,7 +203,7 @@ int main(int argc, char **argv)
   lambda = (double)Constants::c/fc;
   Tracker *tracker = new Tracker(m, n, nDelete, ambiguity->get_cpi(), maxAcc, rangeRes, lambda);
 
-  // setup process spectrum analyser
+  // set up process spectrum analyser
   double spectrumBandwidth = 2000;
   SpectrumAnalyser *spectrumAnalyser = new SpectrumAnalyser(nSamples, spectrumBandwidth);
 
@@ -203,11 +217,12 @@ int main(int argc, char **argv)
     isTracker = false;
   }
 
-  // setup output data
-  bool saveMap;
+  // set up output data
+  bool saveMap, saveDetection;
   tree["save"]["map"] >> saveMap;
-  std::string savePath, saveMapPath;
-  if (saveIq || saveMap)
+  tree["save"]["detection"] >> saveDetection;
+  std::string savePath, saveMapPath, saveDetectionPath;
+  if (saveIq || saveMap || saveDetection)
   {
     char startTimeStr[16];
     struct timeval currentTime = {0, 0};
@@ -219,8 +234,12 @@ int main(int argc, char **argv)
   {
     saveMapPath = savePath + ".map";
   }
+  if (saveDetection)
+  {
+    saveDetectionPath = savePath + ".detection";
+  }
 
-  // setup output timing
+  // set up output timing
   uint64_t tStart = current_time_ms();
   Timing *timing = new Timing(tStart);
   std::vector<std::string> timing_name;
@@ -228,7 +247,7 @@ int main(int argc, char **argv)
   std::string jsonTiming;
   std::vector<uint64_t> time;
 
-  // setup output json
+  // set up output json
   std::string mapJson, detectionJson, jsonTracker, jsonIqData;
 
   // run process
@@ -287,7 +306,7 @@ int main(int argc, char **argv)
 
           // output IqData meta data
           jsonIqData = x->to_json(time[0]/1000);
-          socket_iqdata.sendData(jsonIqData);
+          socket_iqdata->sendData(jsonIqData);
 
           // output map data
           mapJson = map->to_json(time[0]/1000);
@@ -296,21 +315,25 @@ int main(int argc, char **argv)
           {
             map->save(mapJson, saveMapPath);
           }
-          socket_map.sendData(mapJson);
+          socket_map->sendData(mapJson);
 
           // output detection data
           if (isDetection)
           {
             detectionJson = detection->to_json(time[0]/1000);
             detectionJson = detection->delay_bin_to_km(detectionJson, fs);
-            socket_detection.sendData(detectionJson);
+            socket_detection->sendData(detectionJson);
+          }
+          if (saveDetection)
+          {
+            detection->save(detectionJson, saveDetectionPath);
           }
 
           // output tracker data
           if (isTracker)
           {
             jsonTracker = track->to_json(time[0]/1000);
-            socket_track.sendData(jsonTracker);
+            socket_track->sendData(jsonTracker);
           }
 
           // output radar data timer
@@ -329,13 +352,13 @@ int main(int argc, char **argv)
           // output timing data
           timing->update(time[0]/1000, timing_time, timing_name);
           jsonTiming = timing->to_json();
-          socket_timing.sendData(jsonTiming);
+          socket_timing->sendData(jsonTiming);
           timing_time.clear();
           timing_name.clear();
 
           // output CPI timestamp for updating data
           std::string t0_string = std::to_string(time[0]/1000);
-          socket_timestamp.sendData(t0_string);
+          socket_timestamp->sendData(t0_string);
           time.clear();
 
         }
@@ -355,7 +378,7 @@ int main(int argc, char **argv)
 }
 
 void signal_callback_handler(int signum) {
-  std::cout << "Caught signal " << signum << std::endl;
+  std::cout << "Caught signal " << signum << "\n";
   if (CAPTURE_POINTER != nullptr)
   {
     CAPTURE_POINTER->device->kill();
@@ -383,7 +406,7 @@ std::string getopt_process(int argc, char **argv)
 
   if (argc == 1)
   {
-    std::cout << "Error: No arguments provided." << std::endl;
+    std::cout << "Error: No arguments provided." << "\n";
     exit(1);
   }
 
@@ -396,7 +419,7 @@ std::string getopt_process(int argc, char **argv)
     // handle input "-", ":", etc
     if ((argc == 2) && (-1 == opt))
     {
-      std::cout << "Error: No arguments provided." << std::endl;
+      std::cout << "Error: No arguments provided." << "\n";
       exit(1);
     }
 
@@ -429,7 +452,7 @@ std::string ryml_get_file(const char *filename)
   std::ifstream in(filename, std::ios::in | std::ios::binary);
   if (!in)
   {
-    std::cerr << "could not open " << filename << std::endl;
+    std::cerr << "could not open " << filename << "\n";
     exit(1);
   }
   std::ostringstream contents;
