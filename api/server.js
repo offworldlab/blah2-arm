@@ -138,6 +138,26 @@ app.get('/capture/toggle', (req, res) => {
   capture = !capture;
   res.send('{}');
 });
+
+// blah2 posts per-tuner peak dBFS here every ~1s — plain CSV, matching the
+// minimalism of /capture
+var rfStatus = null;
+app.post('/capture/rf-status', express.text(), (req, res) => {
+  const parts = String(req.body).split(',').map(Number);
+  if (parts.length === 3 && parts.every(Number.isFinite)) {
+    rfStatus = {
+      peakDbfsA: parts[0],
+      peakDbfsB: parts[1],
+      timestamp: parts[2],
+      receivedAt: Date.now(),
+    };
+  }
+  res.json({});
+});
+// poll for the latest peak dBFS status
+app.get('/capture/rf-status', (req, res) => {
+  res.json(rfStatus || {});
+});
 app.listen(PORT, HOST, () => {
   console.log(`Running on http://${HOST}:${PORT}`);
 });

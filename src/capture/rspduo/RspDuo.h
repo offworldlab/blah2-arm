@@ -193,6 +193,12 @@ public:
   /// @return Void.
   void replay(IqData *buffer1, IqData *buffer2, std::string file, bool loop);
 
+  /// @brief Read per-tuner peak sample level since the last read.
+  /// @param dbfsA Set to tuner A peak level (dBFS, 0 = full scale).
+  /// @param dbfsB Set to tuner B peak level (dBFS, 0 = full scale).
+  /// @return True (peak dBFS reporting is supported on RspDuo).
+  bool get_peak_dbfs(double &dbfsA, double &dbfsB) override;
+
 };
 
 #endif
