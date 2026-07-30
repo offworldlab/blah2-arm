@@ -16,6 +16,7 @@
 #include "process/spectrum/SpectrumAnalyser.h"
 #include "process/tracker/Tracker.h"
 #include "process/utility/Socket.h"
+#include "process/utility/TuneState.h"
 #include "data/meta/Constants.h"
 
 #include <ryml/ryml.hpp>
@@ -37,6 +38,7 @@
 #include <cstdlib>
 
 Capture *CAPTURE_POINTER = NULL;
+TuneState g_tuneState;
 
 void signal_callback_handler(int signum);
 void getopt_print_help();
@@ -249,7 +251,16 @@ int main(int argc, char **argv)
           buffer1->unlock();
           buffer2->unlock();
           timing_helper(timing_name, timing_time, time, "extract_buffer");
-          
+
+          // live retune: refresh wavelength and drop stale tracks on fc change
+          if (g_tuneState.fcChanged.exchange(false))
+          {
+            fc = g_tuneState.currentFc.load();
+            lambda = (double)Constants::c/fc;
+            tracker->set_lambda(lambda);
+            tracker->reset();
+          }
+
           // spectrum
           spectrumAnalyser->process(x);
           timing_helper(timing_name, timing_time, time, "spectrum");

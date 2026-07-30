@@ -93,6 +93,18 @@ public:
   /// @param detection Detection data for last CPI.
   /// @return Void.
   void initiate(Detection *detection);
+
+  /// @brief Update wavelength after a live center frequency change.
+  /// @param lambda Wavelength for kinematics equations (m).
+  /// @return Void.
+  void set_lambda(double lambda);
+
+  /// @brief Clear all tracks, e.g. after a tower/frequency change.
+  /// @details Existing tracks belong to the old transmitter geometry and
+  /// are meaningless after retuning. The next process() call behaves
+  /// exactly like startup.
+  /// @return Void.
+  void reset();
 };
 
 #endif

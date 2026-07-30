@@ -107,6 +107,9 @@ network:
     iqdata: 34012
 capture:
   fc: 98000000
+  device:
+    gainReduction: [40, 41]
+    lnaState: 4
 truth:
   adsb:
     enabled: false

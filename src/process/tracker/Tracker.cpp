@@ -134,8 +134,20 @@ Detection Tracker::predict(Detection current, double acc, double T)
   return prediction;
 }
 
+void Tracker::set_lambda(double _lambda)
+{
+  lambda = _lambda;
+}
+
+void Tracker::reset()
+{
+  track = Track();
+  doNotInitiate.clear();
+  timestamp = 0;
+}
+
 void Tracker::initiate(Detection *detection)
-{  
+{
   std::vector<double> delay = detection->get_delay();
   std::vector<double> doppler = detection->get_doppler();
   std::vector<double> snr = detection->get_snr();
