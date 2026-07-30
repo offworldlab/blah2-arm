@@ -88,6 +88,13 @@ public:
   virtual bool get_overload(bool &overloadA, bool &overloadB)
     { (void)overloadA; (void)overloadB; return false; }
 
+  /// @brief Read per-tuner peak sample level since the last read.
+  /// @param dbfsA Set to tuner A peak level (dBFS, 0 = full scale).
+  /// @param dbfsB Set to tuner B peak level (dBFS, 0 = full scale).
+  /// @return True if peak dBFS reporting is supported. Default: unsupported.
+  virtual bool get_peak_dbfs(double &dbfsA, double &dbfsB)
+    { (void)dbfsA; (void)dbfsB; return false; }
+
   /// @brief Open a new file to record IQ.
   /// @details First creates a new file from current timestamp.
   /// Files are of format <path>.<type>.iq.

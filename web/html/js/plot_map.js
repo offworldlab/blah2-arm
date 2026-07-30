@@ -106,6 +106,12 @@ var data = [
   {
     z: [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
     colorscale: 'Jet',
+    colorbar: {
+      title: {
+        text: 'SNR (dB)',
+        side: 'right'
+      }
+    },
     type: 'heatmap'
   }
 ];
@@ -113,6 +119,36 @@ var detection = [];
 var adsb = {};
 
 Plotly.newPlot('data', data, layout, config);
+
+// reset-to-full-range control (Plotly's own double-click reset is hidden
+// without the modebar, which is off here for a clean full-bleed display)
+var resetViewBtn = document.createElement('button');
+resetViewBtn.className = 'reset-view-btn';
+resetViewBtn.type = 'button';
+resetViewBtn.textContent = 'Reset View';
+resetViewBtn.addEventListener('click', function () {
+  // Plotly's cartesian double-click-to-reset isn't wired to the native
+  // 'dblclick' DOM event — it tracks its own click timing off raw
+  // mousedown/mouseup on the drag-capture rect, so proxy that instead
+  var dragLayer = document.querySelector('#data .nsewdrag');
+  if (!dragLayer) return;
+  var rect = dragLayer.getBoundingClientRect();
+  var opts = {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+    button: 0
+  };
+  dragLayer.dispatchEvent(new MouseEvent('mousedown', opts));
+  dragLayer.dispatchEvent(new MouseEvent('mouseup', opts));
+  setTimeout(function () {
+    dragLayer.dispatchEvent(new MouseEvent('mousedown', opts));
+    dragLayer.dispatchEvent(new MouseEvent('mouseup', opts));
+  }, 80);
+});
+document.querySelector('.plot-wrapper').appendChild(resetViewBtn);
 
 // callback function
 var intervalId = window.setInterval(function () {
@@ -166,6 +202,12 @@ var intervalId = window.setInterval(function () {
                   x: data.delay,
                   y: data.doppler,
                   colorscale: 'Viridis',
+                  colorbar: {
+                    title: {
+                      text: 'SNR (dB)',
+                      side: 'right'
+                    }
+                  },
                   zauto: false,
                   zmin: 0,
                   zmax: Math.max(13, data.maxPower),

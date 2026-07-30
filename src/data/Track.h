@@ -28,7 +28,7 @@ private:
   /// @brief Track ID (4 digit alpha-numeric).
   std::vector<std::string> id;
 
-  /// @brief State history for each track.
+  /// @brief State history for each track, most recent MAX_HISTORY entries only.
   std::vector<std::vector<std::string>> state;
 
   /// @brief Curent track position.
@@ -37,8 +37,14 @@ private:
   /// @brief Current acceleration (Hz/s).
   std::vector<double> acceleration;
 
-  /// @brief Associated detections in track.
+  /// @brief Associated detections in track, most recent MAX_HISTORY entries only.
   std::vector<std::vector<Detection>> associated;
+
+  /// @brief Total number of detections ever associated with the track.
+  /// @details Tracked separately from associated.size() since that vector is
+  /// capped at MAX_HISTORY - a long-lived track must not lose this count
+  /// when its oldest history entries are trimmed.
+  std::vector<uint64_t> nAssociated;
 
   /// @brief Number of updates the track has been tentative/coasting.
   /// @details Forms criteria for track deletion.
@@ -49,6 +55,15 @@ private:
 
   /// @brief Maximum integer index to wrap around.
   static const uint64_t MAX_INDEX;
+
+  /// @brief Maximum retained length of the state/associated history vectors.
+  /// @details A track that keeps associating every cycle (e.g. a stationary
+  /// clutter breakthrough) is never deleted, so without a cap these vectors
+  /// grow for as long as the track survives - unbounded over weeks of
+  /// continuous operation. Must stay comfortably above tracker.initiate.N
+  /// (promote() reads the last N state entries each cycle) - 100 is a large
+  /// margin over any realistic M-of-N config.
+  static const uint64_t MAX_HISTORY;
 
   /// @brief String for state ACTIVE.
   static const std::string STATE_ACTIVE;
@@ -126,6 +141,11 @@ public:
   /// @brief Get number of updates track has been tentative/coasting.
   /// @return Number of updates track has been tentative/coasting.
   uint64_t get_nInactive(uint64_t index);
+
+  /// @brief Get total number of detections ever associated with a track.
+  /// @details Unlike the capped associated history, this count is never trimmed.
+  /// @return Total number of associated detections.
+  uint64_t get_nAssociated(uint64_t index);
 
   /// @brief Update an associated detection.
   /// @param index Index of track to change.

@@ -10,6 +10,8 @@
 #include "process/tracker/Tracker.h"
 #include "data/meta/Constants.h"
 
+#include "rapidjson/document.h"
+
 #include <string>
 #include <vector>
 #include <random>
@@ -139,4 +141,38 @@ TEST_CASE("Test set_lambda", "[set_lambda]")
   // Doppler prediction is independent of lambda
   CHECK_THAT(after.get_doppler().front(),
     Catch::Matchers::WithinAbs(before.get_doppler().front(), 0.001));
+}
+
+/// @brief Test that a track associating every cycle for far longer than
+/// MAX_HISTORY does not grow its state/associated history without bound.
+/// @details Reproduces the fleet scenario of a stationary clutter/multipath
+/// track that keeps matching every CPI and is therefore never deleted -
+/// its history must be capped even though it survives indefinitely, while
+/// the true lifetime association count must still be reported accurately.
+TEST_CASE("Track history is bounded for a long-lived track", "[track]")
+{
+  Track track;
+  Detection initial(10, -20, 0);
+  uint64_t index = track.add(initial);
+
+  uint32_t nCycles = 500;
+  for (uint32_t i = 0; i < nCycles; i++)
+  {
+    track.set_current(index, initial);
+    track.set_state(index, "ASSOCIATED");
+  }
+
+  // true lifetime count is never trimmed
+  CHECK(track.get_nAssociated(index) == nCycles + 1);
+
+  // but the serialized history window is bounded
+  std::string json = track.to_json(0);
+  rapidjson::Document doc;
+  doc.Parse(json.c_str());
+  const rapidjson::Value& data = doc["data"][0];
+
+  CHECK(data["n"].GetUint64() == nCycles + 1);
+  CHECK(data["associated_delay"].Size() <= 100);
+  CHECK(data["associated_doppler"].Size() <= 100);
+  CHECK(data["associated_state"].Size() <= 100);
 }

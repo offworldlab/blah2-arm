@@ -133,6 +133,30 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
     }
   });
 
+  // peak dBFS reporting thread: independent of the capture-status thread
+  // above (one thread per concern) — reports live per-tuner signal level
+  // to blah2_api every second, no on-change/heartbeat logic needed since
+  // it's a continuous value, not a rare state transition
+  std::thread tPeakStatus([&]{
+    while (true)
+    {
+      httplib::Client cli("http://" + ip_capture + ":"
+        + std::to_string(port_capture));
+
+      double dbfsA = 0, dbfsB = 0;
+      if (device->get_peak_dbfs(dbfsA, dbfsB))
+      {
+        auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch()).count();
+        std::string body = std::to_string(dbfsA) + ","
+          + std::to_string(dbfsB) + "," + std::to_string(now);
+        cli.Post("/capture/rf-status", body, "text/plain");
+      }
+
+      sleep(1);
+    }
+  });
+
   if (!replay)
   {
     device->start();
@@ -144,6 +168,7 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
   }
   t1.join();
   tRetune.join();
+  tPeakStatus.join();
 }
 
 std::unique_ptr<Source> Capture::factory_source(const std::string& type, c4::yml::NodeRef config, bool verbose)

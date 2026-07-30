@@ -13,6 +13,9 @@
 #include <iostream>
 #include <mutex>
 #include <atomic>
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
 
 // class static constants
 const double RspDuo::MAX_FREQUENCY_NR = 2000000000;
@@ -45,6 +48,12 @@ short *buffer_16_ar = NULL;
 std::string file;
 short max_a_nr = 0;
 short max_b_nr = 0;
+// per-tuner peak sample magnitude since the last get_peak_dbfs() read, used
+// to compute a continuous saturation-margin readout (0 dBFS = full scale,
+// always on regardless of stats_fg/verbose, unlike max_a_nr/max_b_nr above)
+static const double FULL_SCALE_NR = 32767.0;
+std::atomic<short> peak_hold_a_fg{0};
+std::atomic<short> peak_hold_b_fg{0};
 bool run_fg = true;
 bool stats_fg = true;
 bool *capture_fg;
@@ -112,6 +121,15 @@ void RspDuo::start()
 void RspDuo::stop()
 {
   uninitialise_device();
+}
+
+bool RspDuo::get_peak_dbfs(double &dbfsA, double &dbfsB)
+{
+  short peakA = peak_hold_a_fg.exchange(0);
+  short peakB = peak_hold_b_fg.exchange(0);
+  dbfsA = 20 * std::log10(std::max(peakA, (short)1) / FULL_SCALE_NR);
+  dbfsB = 20 * std::log10(std::max(peakB, (short)1) / FULL_SCALE_NR);
+  return true;
 }
 
 void RspDuo::process(IqData *_buffer1, IqData *_buffer2)
@@ -607,10 +625,26 @@ unsigned int reset, void *cbContext)
     }
   }
 
+  // track peak sample magnitude for the live dBFS readout (always on,
+  // independent of stats_fg); ratchet the atomic hold up to this block's
+  // peak so it accumulates across every callback until get_peak_dbfs() reads
+  // and resets it
+  {
+    short blockPeak = 0;
+    for (i = 0; i < numSamples; i++)
+    {
+      blockPeak = std::max({blockPeak, (short)std::abs(xi[i]),
+        (short)std::abs(xq[i])});
+    }
+    short prev = peak_hold_a_fg.load();
+    while (blockPeak > prev
+      && !peak_hold_a_fg.compare_exchange_weak(prev, blockPeak)) {}
+  }
+
   return;
 }
 
-void RspDuo::stream_b_callback(short *xi, short *xq, 
+void RspDuo::stream_b_callback(short *xi, short *xq,
 sdrplay_api_StreamCbParamsT *params, unsigned int numSamples, 
 unsigned int reset, void *cbContext)
 {
@@ -666,6 +700,20 @@ unsigned int reset, void *cbContext)
         max_b_nr = xi[i];
       }
     }
+  }
+
+  // track peak sample magnitude for the live dBFS readout — see the
+  // matching block in stream_a_callback for details
+  {
+    short blockPeak = 0;
+    for (i = 0; i < numSamples; i++)
+    {
+      blockPeak = std::max({blockPeak, (short)std::abs(xi[i]),
+        (short)std::abs(xq[i])});
+    }
+    short prev = peak_hold_b_fg.load();
+    while (blockPeak > prev
+      && !peak_hold_b_fg.compare_exchange_weak(prev, blockPeak)) {}
   }
 
   return;
