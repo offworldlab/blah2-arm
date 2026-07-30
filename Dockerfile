@@ -59,7 +59,7 @@ ENV VCPKG_ROOT=/opt/vcpkg
 ENV CC=/usr/bin/gcc
 ENV CXX=/usr/bin/g++
 RUN export PATH="/opt/vcpkg:${PATH}" \
-    && git clone https://github.com/microsoft/vcpkg /opt/vcpkg \
+    && git clone --branch 2026.06.24 --depth 1 https://github.com/microsoft/vcpkg /opt/vcpkg \
     && if [ "$(uname -m)" = "aarch64" ]; then export VCPKG_FORCE_SYSTEM_BINARIES=1; fi \
     && /opt/vcpkg/bootstrap-vcpkg.sh -disableMetrics \
     && cd /opt/blah2/lib && vcpkg integrate install \
