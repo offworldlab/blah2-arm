@@ -142,6 +142,19 @@ void RspDuo::process(IqData *_buffer1, IqData *_buffer2)
   {
     std::lock_guard<std::mutex> lock(sdrplay_update_mutex);
 
+    // Reassign gain/LNA fields immediately before the Update calls below,
+    // even though set_device_parameters() already staged these same values
+    // before Init(). Diagnosed live on jonathan-node-2 via the SDRplay
+    // event callback's own GainChange log: without this reassignment, the
+    // surveillance tuner's (B) Update_Tuner_Gr call reports success but the
+    // device confirms it's still holding tuner A's gRdB, not its own -
+    // reassigning to the identical value immediately before Update is what
+    // makes the device actually apply it correctly.
+    deviceParams->rxChannelA->tunerParams.gain.gRdB = gain_reduction_nr_a;
+    deviceParams->rxChannelA->tunerParams.gain.LNAstate = lna_state_nr;
+    deviceParams->rxChannelB->tunerParams.gain.gRdB = gain_reduction_nr_b;
+    deviceParams->rxChannelB->tunerParams.gain.LNAstate = lna_state_nr;
+
     // update gains after initialization
     if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_A,
                         sdrplay_api_Update_Tuner_Gr,
@@ -155,6 +168,35 @@ void RspDuo::process(IqData *_buffer1, IqData *_buffer2)
                       sdrplay_api_Update_Tuner_Gr,
                       sdrplay_api_Update_Ext1_None)) != sdrplay_api_Success) {
         std::cerr << "Failed to update Tuner B gain: " << sdrplay_api_GetErrorString(err) << std::endl;
+        sdrplay_api_Close();
+        exit(1);
+    }
+
+    // Same reassign-then-Update pattern as the gain reduction above, for
+    // the same reason: confirmed live that a fresh Init doesn't reliably
+    // apply AGC on both tuners without this. See the AGC comment in
+    // set_device_parameters() for why both tuners get AGC identically.
+    deviceParams->rxChannelA->ctrlParams.agc.enable = agc_enable_nr;
+    deviceParams->rxChannelB->ctrlParams.agc.enable = agc_enable_nr;
+    if (agc_enable_nr != sdrplay_api_AGC_DISABLE)
+    {
+      int agc_setpoint_dbfs_nr = (0 < agc_set_point_nr) ? 0 : agc_set_point_nr;
+      deviceParams->rxChannelA->ctrlParams.agc.setPoint_dBfs = agc_setpoint_dbfs_nr;
+      deviceParams->rxChannelB->ctrlParams.agc.setPoint_dBfs = agc_setpoint_dbfs_nr;
+    }
+
+    if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_A,
+                      sdrplay_api_Update_Ctrl_Agc,
+                      sdrplay_api_Update_Ext1_None)) != sdrplay_api_Success) {
+        std::cerr << "Failed to update Tuner A AGC: " << sdrplay_api_GetErrorString(err) << std::endl;
+        sdrplay_api_Close();
+        exit(1);
+    }
+
+    if ((err = sdrplay_api_Update(chosenDevice->dev, sdrplay_api_Tuner_B,
+                      sdrplay_api_Update_Ctrl_Agc,
+                      sdrplay_api_Update_Ext1_None)) != sdrplay_api_Success) {
+        std::cerr << "Failed to update Tuner B AGC: " << sdrplay_api_GetErrorString(err) << std::endl;
         sdrplay_api_Close();
         exit(1);
     }
@@ -541,24 +583,41 @@ void RspDuo::set_device_parameters()
   // set center frequency
   chParams->tunerParams.rfFreq.rfHz = fc;
 
-  // set AGC - intentionally reference channel (A) only; applying AGC to the
-  // surveillance channel (B) would distort its spectral content and degrade correlation
-  chParams->ctrlParams.agc.enable = sdrplay_api_AGC_DISABLE;
+  // set AGC on both tuners, identically and explicitly. RSPduo Dual Tuner
+  // mode does not support isolating AGC to one tuner: confirmed live
+  // (jonathan-node-2, via the SDRplay event callback's own GainChange log)
+  // that enabling AGC through this channel-A configuration alone also
+  // activates a real, independently-converging AGC loop on tuner B, even
+  // though its struct was never touched. AGC on either channel degrades
+  // coherent cross-correlation - a time-varying gain smears the delay-
+  // Doppler response - so it's used sparingly, only as a last resort after
+  // manual gain/LNA tuning has already failed to find safe values (see
+  // Auto-Calibrate's AGC fallback in retina-gui). Given that reality, both
+  // tuners are configured identically and explicitly here rather than
+  // leaving tuner B to that unexamined coupling: when AGC is needed at
+  // all, protecting both channels from overload beats leaving surveillance
+  // exposed on a fixed guess, and hard clipping is worse for correlation
+  // than AGC-induced smearing.
+  agc_enable_nr = sdrplay_api_AGC_DISABLE;
   if (agc_bandwidth_nr == 5)
   {
-    chParams->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
+    agc_enable_nr = sdrplay_api_AGC_5HZ;
   }
   else if (agc_bandwidth_nr == 50)
   {
-    chParams->ctrlParams.agc.enable = sdrplay_api_AGC_50HZ;
+    agc_enable_nr = sdrplay_api_AGC_50HZ;
   }
   else if (agc_bandwidth_nr == 100)
   {
-    chParams->ctrlParams.agc.enable = sdrplay_api_AGC_100HZ;
+    agc_enable_nr = sdrplay_api_AGC_100HZ;
   }
-  if (chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE)
+  deviceParams->rxChannelA->ctrlParams.agc.enable = agc_enable_nr;
+  deviceParams->rxChannelB->ctrlParams.agc.enable = agc_enable_nr;
+  if (agc_enable_nr != sdrplay_api_AGC_DISABLE)
   {
-    chParams->ctrlParams.agc.setPoint_dBfs = (0 < agc_set_point_nr) ? 0 : agc_set_point_nr;
+    int agc_setpoint_dbfs_nr = (0 < agc_set_point_nr) ? 0 : agc_set_point_nr;
+    deviceParams->rxChannelA->ctrlParams.agc.setPoint_dBfs = agc_setpoint_dbfs_nr;
+    deviceParams->rxChannelB->ctrlParams.agc.setPoint_dBfs = agc_setpoint_dbfs_nr;
   }
 
   // set gain reduction and lna sate
