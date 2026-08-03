@@ -35,6 +35,10 @@ private:
   int agc_bandwidth_nr;
   /// @brief AGC set point (dBfs)
   int agc_set_point_nr;
+  /// @brief AGC enable value derived from agc_bandwidth_nr in
+  /// set_device_parameters(), applied identically to both tuners there and
+  /// reapplied in process() - see the AGC comment in set_device_parameters().
+  sdrplay_api_AgcControlT agc_enable_nr;
   /// @brief Gain reduction for tuner A / reference channel (dB).
   int gain_reduction_nr_a;
   /// @brief Gain reduction for tuner B / surveillance channel (dB).
