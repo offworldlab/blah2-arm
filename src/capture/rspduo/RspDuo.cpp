@@ -142,14 +142,27 @@ void RspDuo::process(IqData *_buffer1, IqData *_buffer2)
   {
     std::lock_guard<std::mutex> lock(sdrplay_update_mutex);
 
-    // Reassign gain/LNA fields immediately before the Update calls below,
-    // even though set_device_parameters() already staged these same values
-    // before Init(). Diagnosed live on jonathan-node-2 via the SDRplay
-    // event callback's own GainChange log: without this reassignment, the
-    // surveillance tuner's (B) Update_Tuner_Gr call reports success but the
-    // device confirms it's still holding tuner A's gRdB, not its own -
-    // reassigning to the identical value immediately before Update is what
-    // makes the device actually apply it correctly.
+    // Re-stage the per-tuner gain/LNA fields here, after Init().
+    //
+    // set_device_parameters() already wrote these before Init(), but they
+    // do not survive it. Read the structs back immediately after Init()
+    // returns and rxChannelB holds channel A's values, not the ones staged
+    // for B: stage A gRdB=20 / B gRdB=59 and it reads back 20 / 20
+    // (measured on owl, RSPduo, API 3.15). Without re-staging, the Update
+    // below reports Success and pushes A's gain to tuner B, silently
+    // running surveillance at the reference channel's gain. Confirmed the
+    // other way round too - stage A=59 / B=20 and tuner B ends up at 59,
+    // so B follows A regardless of what B was configured with.
+    //
+    // Re-writing the values is the part that matters, not retrying the
+    // Update. A sleep(1) before the Update and a background retry thread
+    // were both tried and both failed: nothing is wrong with the Update
+    // itself, the value it would push is simply gone by the time it runs.
+    //
+    // This is not specific to gain. Every rxChannelB field tested reads
+    // back as channel A's value after Init() (bwType, ifType, decimation,
+    // notches and the AGC fields below), so anything that needs to differ
+    // per tuner has to be re-staged here and pushed with an Update.
     deviceParams->rxChannelA->tunerParams.gain.gRdB = gain_reduction_nr_a;
     deviceParams->rxChannelA->tunerParams.gain.LNAstate = lna_state_nr;
     deviceParams->rxChannelB->tunerParams.gain.gRdB = gain_reduction_nr_b;
@@ -172,9 +185,9 @@ void RspDuo::process(IqData *_buffer1, IqData *_buffer2)
         exit(1);
     }
 
-    // Same reassign-then-Update pattern as the gain reduction above, for
-    // the same reason: confirmed live that a fresh Init doesn't reliably
-    // apply AGC on both tuners without this. See the AGC comment in
+    // Same re-stage-then-Update pattern as the gain reduction above, and
+    // for the same reason: what was staged on rxChannelB before Init() is
+    // not what the struct holds afterwards. See the AGC comment in
     // set_device_parameters() for why both tuners get AGC identically.
     deviceParams->rxChannelA->ctrlParams.agc.enable = agc_enable_nr;
     deviceParams->rxChannelB->ctrlParams.agc.enable = agc_enable_nr;
@@ -583,21 +596,49 @@ void RspDuo::set_device_parameters()
   // set center frequency
   chParams->tunerParams.rfFreq.rfHz = fc;
 
-  // set AGC on both tuners, identically and explicitly. RSPduo Dual Tuner
-  // mode does not support isolating AGC to one tuner: confirmed live
-  // (jonathan-node-2, via the SDRplay event callback's own GainChange log)
-  // that enabling AGC through this channel-A configuration alone also
-  // activates a real, independently-converging AGC loop on tuner B, even
-  // though its struct was never touched. AGC on either channel degrades
-  // coherent cross-correlation - a time-varying gain smears the delay-
-  // Doppler response - so it's used sparingly, only as a last resort after
-  // manual gain/LNA tuning has already failed to find safe values (see
-  // Auto-Calibrate's AGC fallback in retina-gui). Given that reality, both
-  // tuners are configured identically and explicitly here rather than
-  // leaving tuner B to that unexamined coupling: when AGC is needed at
-  // all, protecting both channels from overload beats leaving surveillance
-  // exposed on a fixed guess, and hard clipping is worse for correlation
-  // than AGC-induced smearing.
+  // Set AGC on both tuners, identically and explicitly.
+  //
+  // Why AGC is a last resort at all. Detection runs off the cross-ambiguity
+  // function
+  //
+  //   CAF(tau, fd) = integral of
+  //                    ref(t) . conj(surv(t - tau)) . exp(-j.2.pi.fd.t) dt
+  //
+  // which assumes the relationship between the two channels is stable
+  // across the whole CPI (0.5 s in this config). Fixed per-channel gains
+  // are just a constant scale factor outside the integral and cost
+  // nothing. AGC replaces that constant with a time-varying g(t) inside
+  // the integrand, and a time-varying amplitude weighting inside a
+  // Doppler-extracting integral is exactly what broadens the Doppler
+  // response and leaks energy into the sidelobes. It spends coherent
+  // processing gain, so it costs real detection SNR: worse Pd for a given
+  // Pfa. That is also the concrete reason 5 Hz is the gentlest setting and
+  // 50/100 Hz are worse - it is how many uncontrolled gain steps land
+  // inside one 0.5 s coherent integration window.
+  //
+  // AGC running on both channels is worse than on one. Reference sees a
+  // strong and relatively stable direct path; surveillance sees a weak,
+  // noisier mix of leakage, echoes and noise, and chases a different
+  // setpoint. The two loops therefore fluctuate independently, and two
+  // uncorrelated fluctuations compound (roughly additive in variance in
+  // dB) rather than averaging out.
+  //
+  // It is kept anyway, on both tuners, because clipping is categorically
+  // worse than smearing: a saturated ADC destroys the waveform outright,
+  // whereas AGC only degrades it. AGC is only ever reached as a last
+  // resort, after manual gain/LNA tuning has already failed to find safe
+  // values (see Auto-Calibrate's AGC fallback in retina-gui). At that
+  // point surveillance is on a fixed guess already known not to work, and
+  // leaving it exposed to the one unrecoverable failure mode is the worse
+  // trade.
+  //
+  // Both channels are written explicitly rather than left to the driver.
+  // rxChannelB's agc.enable defaults to sdrplay_api_AGC_50HZ with a -60
+  // dBFS setpoint (see sdrplay_api_control.h), so configuring channel A
+  // alone leaves surveillance running an AGC loop nobody asked for,
+  // against a setpoint nobody chose. Measured live: with AGC configured
+  // through channel A only, both tuners run their own converging loops,
+  // A falling 41 -> 25 dB while B climbs 52 -> 59 dB.
   agc_enable_nr = sdrplay_api_AGC_DISABLE;
   if (agc_bandwidth_nr == 5)
   {
