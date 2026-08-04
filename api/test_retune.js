@@ -146,10 +146,73 @@ async function testEndpoints() {
   check('overload-status echoes overload flags',
     rf.overloadA === true && rf.overloadB === false
     && typeof rf.timestamp === 'number');
+  check('3-field post carries no counts', rf.overloadCountA === undefined);
+
+  // Onset counts. A consumer cannot rely on the flags alone to answer "does
+  // this operating point clip?" — the flags are a level, and the device
+  // recovers faster than anyone polls, so a whole episode can pass with every
+  // sample reading false. The counts are monotonic so none can be missed.
+  res = await request('POST', '/capture/overload-status', `0,0,${Date.now()},7,3`);
+  check('5-field overload post accepted', res.status === 200);
+  res = await request('GET', '/capture/overload-status');
+  const rfc = JSON.parse(res.body);
+  check('counts are exposed alongside a clean level',
+    rfc.overloadA === false && rfc.overloadB === false
+    && rfc.overloadCountA === 7 && rfc.overloadCountB === 3);
+
+  res = await request('POST', '/capture/overload-status', `0,0,${Date.now()},9,3`);
+  res = await request('GET', '/capture/overload-status');
+  check('counts advance independently of the level',
+    JSON.parse(res.body).overloadCountA === 9);
+
+  res = await request('POST', '/capture/overload-status', `1,2,3,4`);
+  check('malformed 4-field post ignored', res.status === 200);
+  res = await request('GET', '/capture/overload-status');
+  check('state unchanged after malformed post',
+    JSON.parse(res.body).overloadCountA === 9);
 
   // fc staleness fix: /api/adsb2dd is disabled here, but /api/config works
   // and the retune POST must have updated config.capture.fc in memory —
   // verified indirectly by the CSV reflecting it (already checked above).
+
+  // retune retirement: blah2 gives up on a generation it cannot apply, and
+  // this API must stop offering it. Without that, a pending retune the
+  // hardware refuses is retried every poll forever, and survives a blah2
+  // restart because the attempt count lives in blah2's memory, not here.
+  res = await request('POST', '/capture/retune',
+    { fc: 99000000, gainReductionA: 30, gainReductionB: 31, lnaState: 5 });
+  const doomed = JSON.parse(res.body).generation;
+  check('new generation issued for the retirement case', doomed === 3);
+  res = await request('GET', '/capture/retune');
+  check('doomed generation is served before rejection',
+    res.body === `${doomed},99000000,30,31,5`);
+
+  res = await request('POST', '/capture/retune/reject', `${doomed},3`);
+  check('reject accepted', res.status === 200);
+  res = await request('GET', '/capture/retune');
+  check('rejected generation is no longer offered (reported as 0)',
+    res.body === '0,99000000,30,31,5');
+
+  res = await request('GET', '/capture/retune/status');
+  const rejected = JSON.parse(res.body).rejected;
+  check('status exposes the rejection',
+    rejected && rejected.generation === doomed && rejected.attempts === 3);
+  check('status still carries the last successful ack',
+    JSON.parse(res.body).generation === 2);
+
+  // a stale rejection must not suppress a newer request
+  res = await request('POST', '/capture/retune',
+    { fc: 97000000, gainReductionA: 55, gainReductionB: 56, lnaState: 8 });
+  const revived = JSON.parse(res.body).generation;
+  res = await request('GET', '/capture/retune');
+  check('a new request clears the rejection and is offered',
+    res.body === `${revived},97000000,55,56,8`);
+
+  res = await request('POST', '/capture/retune/reject', `${doomed},3`);
+  check('late reject for a superseded generation is ignored', res.status === 200);
+  res = await request('GET', '/capture/retune');
+  check('superseded rejection does not suppress the current generation',
+    res.body === `${revived},97000000,55,56,8`);
 }
 
 async function main() {

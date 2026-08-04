@@ -88,6 +88,16 @@ public:
   virtual bool get_overload(bool &overloadA, bool &overloadB)
     { (void)overloadA; (void)overloadB; return false; }
 
+  /// @brief Read the monotonic count of per-tuner overload onsets.
+  /// @param countA Set to tuner A onset count since start.
+  /// @param countB Set to tuner B onset count since start.
+  /// @return True if overload counting is supported. Default: unsupported.
+  /// @note Consumers should prefer these over the level above when asking
+  /// "did this operating point clip?" - the level can only be sampled, and
+  /// this hardware clips and recovers fast enough to slip between polls.
+  virtual bool get_overload_counts(unsigned long &countA, unsigned long &countB)
+    { (void)countA; (void)countB; return false; }
+
   /// @brief Read per-tuner peak sample level since the last read.
   /// @param dbfsA Set to tuner A peak level (dBFS, 0 = full scale).
   /// @param dbfsB Set to tuner B peak level (dBFS, 0 = full scale).

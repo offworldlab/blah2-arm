@@ -10,6 +10,13 @@
 // constants
 const std::string Capture::VALID_TYPE[1] = {"RspDuo"};
 
+// How many times one retune generation is attempted before being given up
+// on. A pending retune is re-attempted on every poll until it succeeds, so
+// some cap is needed; a few attempts still absorb a transient failure
+// (device momentarily busy) without holding the radio hostage to a request
+// it will never accept.
+static const int MAX_RETUNE_ATTEMPTS = 3;
+
 // constructor
 Capture::Capture(std::string _type, uint32_t _fs, uint32_t _fc, std::string _path)
 {
@@ -58,6 +65,8 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
   std::thread tRetune([&]{
     bool lastOverloadA = false;
     bool lastOverloadB = false;
+    unsigned long lastOverloadCountA = 0;
+    unsigned long lastOverloadCountB = 0;
     bool overloadReported = false;
     auto lastRfStatusPost = std::chrono::steady_clock::now();
 
@@ -77,10 +86,18 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
               &generation, &newFc, &newGainA, &newGainB, &newLnaState) == 5
             && generation > 0 && generation > lastAppliedRetuneGeneration)
         {
+          if (generation != attemptedRetuneGeneration)
+          {
+            attemptedRetuneGeneration = generation;
+            retuneAttempts = 0;
+          }
+          ++retuneAttempts;
+
           bool fcChanged = false;
           if (device->retune(newFc, newGainA, newGainB, newLnaState, fcChanged))
           {
             lastAppliedRetuneGeneration = generation;
+            retuneAttempts = 0;
             fc = newFc;
             if (fcChanged)
             {
@@ -100,7 +117,30 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
           else
           {
             std::cerr << "[Capture] Retune generation " << generation
-              << " rejected" << std::endl;
+              << " rejected (attempt " << retuneAttempts << " of "
+              << MAX_RETUNE_ATTEMPTS << ")" << std::endl;
+
+            if (retuneAttempts >= MAX_RETUNE_ATTEMPTS)
+            {
+              // Stop here rather than re-attempting on every poll forever.
+              // A retune the device will not take is usually one it cannot
+              // take - most often the requested tuning saturates the front
+              // end, which makes the SDRplay API stop answering control
+              // calls, so retrying the same values cannot recover it and
+              // only holds the device down. Marking it applied locally
+              // retires it for this process; the POST retires it in the API
+              // too, without which a restarted blah2 would start its own
+              // attempt count from zero and pick the same request up again.
+              // No ack is sent: the requester still correctly sees this
+              // generation as never applied.
+              lastAppliedRetuneGeneration = generation;
+              std::cerr << "[Capture] Abandoning retune generation "
+                << generation << " after " << retuneAttempts
+                << " failed attempts" << std::endl;
+              cli.Post("/capture/retune/reject",
+                std::to_string(generation) + "," + std::to_string(retuneAttempts),
+                "text/plain");
+            }
           }
         }
       }
@@ -110,19 +150,35 @@ void Capture::process(IqData *buffer1, IqData *buffer2, c4::yml::NodeRef config,
       bool overloadA = false, overloadB = false;
       if (device->get_overload(overloadA, overloadB))
       {
+        // Onset counts ride along with the level. The level alone is not
+        // enough for a consumer deciding whether an operating point clips:
+        // this loop only samples every 250ms and the device recovers faster
+        // than that, so a whole overload episode can begin and end with the
+        // level reading false at both ends. The counts are incremented in
+        // the driver's event callback, so they capture every episode
+        // regardless of when anyone looks.
+        unsigned long countA = 0, countB = 0;
+        device->get_overload_counts(countA, countB);
+
         auto sinceLastPost = std::chrono::steady_clock::now() - lastRfStatusPost;
         if (!overloadReported || overloadA != lastOverloadA
             || overloadB != lastOverloadB
+            // A changed count with an unchanged level is precisely the
+            // missed-episode case, and must still be published promptly.
+            || countA != lastOverloadCountA || countB != lastOverloadCountB
             || sinceLastPost > std::chrono::seconds(2))
         {
           auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
           std::string body = std::string(overloadA ? "1" : "0") + ","
-            + (overloadB ? "1" : "0") + "," + std::to_string(now);
+            + (overloadB ? "1" : "0") + "," + std::to_string(now) + ","
+            + std::to_string(countA) + "," + std::to_string(countB);
           if (cli.Post("/capture/overload-status", body, "text/plain"))
           {
             lastOverloadA = overloadA;
             lastOverloadB = overloadB;
+            lastOverloadCountA = countA;
+            lastOverloadCountB = countB;
             overloadReported = true;
             lastRfStatusPost = std::chrono::steady_clock::now();
           }
