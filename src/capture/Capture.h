@@ -37,8 +37,16 @@ private:
   /// @brief Absolute path of file to replay.
   std::string file;
 
-  /// @brief Last retune generation applied to the device.
+  /// @brief Last retune generation applied to the device, or abandoned after
+  /// too many failed attempts (see MAX_RETUNE_ATTEMPTS in Capture.cpp).
   long lastAppliedRetuneGeneration = 0;
+
+  /// @brief Generation the retune thread is currently attempting, and how
+  /// many times it has tried it. A pending retune is re-attempted on every
+  /// poll until it succeeds, so without a cap one the hardware cannot accept
+  /// is retried indefinitely.
+  long attemptedRetuneGeneration = 0;
+  int retuneAttempts = 0;
 
 public:
 

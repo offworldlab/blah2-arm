@@ -224,6 +224,12 @@ public:
   /// @return True (overload reporting is supported on RspDuo).
   bool get_overload(bool &overloadA, bool &overloadB) override;
 
+  /// @brief Read the monotonic count of per-tuner overload onsets.
+  /// @param countA Set to tuner A onset count since start.
+  /// @param countB Set to tuner B onset count since start.
+  /// @return True (overload counting is supported on RspDuo).
+  bool get_overload_counts(unsigned long &countA, unsigned long &countB) override;
+
   /// @brief Read per-tuner peak sample level since the last read.
   /// @param dbfsA Set to tuner A peak level (dBFS, 0 = full scale).
   /// @param dbfsB Set to tuner B peak level (dBFS, 0 = full scale).

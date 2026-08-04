@@ -151,13 +151,28 @@ var retune = {
 };
 // last ack blah2 posted back, or null if none yet
 var retuneStatus = null;
+// set when blah2 gives up on the pending generation (see
+// /capture/retune/reject). Until the next POST /capture/retune supersedes
+// it, the GET below must stop offering that generation: blah2 retries a
+// pending retune every poll until it succeeds, and its own attempt counter
+// lives in process memory, so without this a request the hardware cannot
+// accept is re-attempted forever — and a fresh blah2 (container restart,
+// crash loop) starts counting from zero and picks the same one straight
+// back up. Observed on a live node: a retune that saturated the front end
+// left the whole stack re-applying it several times a minute, and
+// restarting blah2 did not clear it because this API kept serving it.
+var retuneRejection = null;
 // last RF/overload status blah2 posted, or null if none yet
 var overloadStatus = null;
 
 // blah2 polls this — plain CSV, matching the minimalism of /capture
 app.get('/capture/retune', (req, res) => {
+  // A rejected generation is reported as 0 ("nothing pending") rather than
+  // withheld, so blah2's parser takes its existing no-op path unchanged.
+  const generation = (retuneRejection
+    && retuneRejection.generation === retune.generation) ? 0 : retune.generation;
   res.type('text/plain').send(
-    retune.generation + ',' + retune.fc + ','
+    generation + ',' + retune.fc + ','
     + retune.gainReductionA + ',' + retune.gainReductionB + ','
     + retune.lnaState
   );
@@ -174,6 +189,12 @@ app.post('/capture/retune', express.json(), (req, res) => {
   retune.gainReductionA = gainReductionA;
   retune.gainReductionB = gainReductionB;
   retune.lnaState = lnaState;
+  // A new request supersedes any earlier give-up: this generation has not
+  // been tried yet and deserves its own attempts, even if the previous one
+  // was abandoned. (Retina-gui's Auto-Calibrate relies on this — after a
+  // candidate is refused it retreats to a safer one, which must be allowed
+  // through.)
+  retuneRejection = null;
   // keep the ADS-B bistatic Doppler calc in sync with the radio's real fc
   config.capture.fc = fc;
   res.json({ success: true, generation: retune.generation });
@@ -194,24 +215,60 @@ app.post('/capture/retune/ack', express.text(), (req, res) => {
   }
   res.json({});
 });
-// poll for the last applied retune
+// blah2 posts here when it has exhausted its attempts at a generation and is
+// giving up on it. Body: "<generation>,<attempts>". This is what stops the
+// retry loop surviving a blah2 restart — see retuneRejection above.
+app.post('/capture/retune/reject', express.text(), (req, res) => {
+  const parts = String(req.body).split(',').map(Number);
+  if (parts.length === 2 && parts.every(Number.isFinite)) {
+    // Only the generation still pending can be rejected; a late rejection
+    // for a superseded one must not suppress the newer request.
+    if (parts[0] === retune.generation) {
+      retuneRejection = {
+        generation: parts[0],
+        attempts: parts[1],
+        rejectedAt: Date.now(),
+      };
+    }
+  }
+  res.json({});
+});
+// poll for the last applied retune. `rejected` is additive: callers that only
+// read generation/appliedAt (retina-gui's Blah2Client) are unaffected, but it
+// lets one distinguish "blah2 never saw it" from "the hardware refused it",
+// which otherwise look identical from outside.
 app.get('/capture/retune/status', (req, res) => {
-  res.json(retuneStatus || {});
+  const body = Object.assign({}, retuneStatus || {});
+  if (retuneRejection) {
+    body.rejected = retuneRejection;
+  }
+  res.json(body);
 });
 // blah2 posts per-tuner RF overload state (on change + heartbeat). Deliberately
 // its own endpoint, not /capture/rf-status — that path already belongs to the
 // (unrelated) peak-dBFS meter feature; no consumer needs both in one call, so
 // keeping them on separate endpoints avoids coupling two independent features
 // together just because they both report "something about RF status."
+// Accepts "overloadA,overloadB,timestamp" and the newer
+// "overloadA,overloadB,timestamp,countA,countB". The counts are monotonic
+// tallies of overload *onsets*, which a consumer needs because the flags are
+// a level: this hardware clips and recovers faster than anyone polls, so an
+// entire episode can pass with every sample of the level reading false. Both
+// lengths are accepted so a newer API can run against an older blah2 without
+// the endpoint silently discarding its posts.
 app.post('/capture/overload-status', express.text(), (req, res) => {
   const parts = String(req.body).split(',').map(Number);
-  if (parts.length === 3 && parts.every(Number.isFinite)) {
+  if ((parts.length === 3 || parts.length === 5) && parts.every(Number.isFinite)) {
     overloadStatus = {
       overloadA: parts[0] === 1,
       overloadB: parts[1] === 1,
       timestamp: parts[2],
       receivedAt: Date.now(),
     };
+    if (parts.length === 5) {
+      overloadStatus.overloadCountA = parts[3];
+      overloadStatus.overloadCountB = parts[4];
+    }
   }
   res.json({});
 });
