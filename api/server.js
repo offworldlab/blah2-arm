@@ -17,6 +17,15 @@ try {
   console.error('Error reading or parsing the YAML file:', e);
 }
 
+// ADS-B truth is the only thing here that needs a position; the radar, maps and
+// IQ never read one. See location.js for what breaks without this check.
+const { hasLocation } = require('./location.js');
+
+function adsbTruthAvailable() {
+  return !!(config && config.truth && config.truth.adsb
+            && config.truth.adsb.enabled && hasLocation(config));
+}
+
 var stash_map = require('./stash/maxhold.js');
 var stash_detection = require('./stash/detection.js');
 var stash_iqdata = require('./stash/iqdata.js');
@@ -325,7 +334,7 @@ const server_detection = net.createServer((socket)=>{
         processingDetection = true;
         try {
           const det = JSON.parse(data_detection);
-          if (config.truth.adsb.enabled) {
+          if (adsbTruthAvailable()) {
             const aircraft = await getCachedAircraft();
             det.adsb = det.delay.map((delay, idx) => {
               const doppler = det.doppler[idx];
@@ -667,7 +676,7 @@ async function fetchFromTar1090AndExtrapolate(clientDetectionTs) {
 }
 
 app.get('/api/adsb2dd', async (req, res) => {
-  if (!config.truth.adsb.enabled) {
+  if (!adsbTruthAvailable()) {
     return res.status(400).end();
   }
 
@@ -690,7 +699,7 @@ app.get('/api/adsb2dd', async (req, res) => {
 });
 
 app.get('/api/adsb2dd/diagnostic', async (req, res) => {
-  if (!config.truth.adsb.enabled) {
+  if (!adsbTruthAvailable()) {
     return res.status(400).end();
   }
 
