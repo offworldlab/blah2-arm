@@ -139,14 +139,13 @@ app.get('/stash/timing', (req, res) => {
   res.send(stash_timing.get_data_timing());
 });
 
-// read state of capture
+// read state of capture. blah2 polls this once a second to decide whether to
+// write IQ. There is deliberately no endpoint to set it: the toggle used to be
+// an unauthenticated mutating GET bound to the spacebar, and a single stray
+// keypress filled a node's disk. Any replacement must be an explicit control
+// (a button, a POST, and a visible recording indicator), not a bare keybinding.
 app.get('/capture', (req, res) => {
   res.send(capture);
-});
-// toggle state of capture
-app.get('/capture/toggle', (req, res) => {
-  capture = !capture;
-  res.send('{}');
 });
 
 // live retune state: seeded from the config this stack booted with;
