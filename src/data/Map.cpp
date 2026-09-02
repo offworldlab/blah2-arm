@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <chrono>
+#include <cstdint>
 
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
@@ -205,6 +206,24 @@ void Map<T>::set_metrics()
   this->maxPower = maxPower - noisePower;
 }
 
+// Bound on the save.map file.
+//
+// A node writes this to its own SD card and nothing ever truncates it: save()
+// appends one range-doppler frame per CPI to a single file for as long as blah2
+// runs. Measured on a node: 2.21 MB a frame against an observed CPI of 1.17 s,
+// so 1.87 MB/s, or 158 GB/day. That fills a 24 GB data partition in under four
+// hours.
+//
+// save.map is off by default and retina-gui does not offer it, but user.yml is
+// an unrestricted deep merge that support edits over SSH, so "not exposed" is
+// not the same as "cannot happen" and the bound belongs with the writer.
+//
+// Past the bound the array is left closed and valid and further maps are
+// dropped. Rotating or truncating instead would discard the beginning of the
+// very capture the flag was turned on to collect.
+static constexpr uintmax_t SAVE_MAP_MAX_BYTES = 512ULL * 1024 * 1024;
+static bool saveBoundReached = false;
+
 template <class T>
 bool Map<T>::save(std::string _json, std::string filename)
 {
@@ -224,6 +243,22 @@ bool Map<T>::save(std::string _json, std::string filename)
   // add the document to the file
   if (FILE *fp = fopen(filename.c_str(), "rb+"); fp)
   {
+    // stop before the bound rather than after it
+    std::fseek(fp, 0, SEEK_END);
+    if (long size = std::ftell(fp);
+        size < 0 || static_cast<uintmax_t>(size) + _json.length() + 2 > SAVE_MAP_MAX_BYTES)
+    {
+      std::fclose(fp);
+      if (!saveBoundReached)
+      {
+        saveBoundReached = true;
+        std::cerr << "Warning: " << filename << " reached the "
+                  << (SAVE_MAP_MAX_BYTES / (1024 * 1024))
+                  << " MB bound, no further maps will be saved" << std::endl;
+      }
+      return false;
+    }
+
     // check if first is [
     std::fseek(fp, 0, SEEK_SET);
     if (getc(fp) != '[')
